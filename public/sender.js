@@ -614,37 +614,71 @@ async function sendQueueSequential(manifest, totalBytes){
     currentFileEl.textContent = `${i+1}/${queue.length} ${f.name}`;
     dc.send(JSON.stringify({ type: "meta", index: i+1, name: f.name, size: f.size, mime: f.type || "application/octet-stream" }));
 
-    const reader = f.stream().getReader();
-    const chunkSize = 64 * 1024;
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+    // Use larger chunks and event-driven backpressure for higher throughput.
+    const chunkSize = 512 * 1024; // 512 KB
+    const HIGH_WATER = 64 * 1024 * 1024; // 64 MB buffered before pausing
+    const LOW_WATER  = 16 * 1024 * 1024; // resume once buffered drops below this
 
-      let offset = 0;
-      while (offset < value.byteLength) {
-        const slice = value.slice(offset, offset + chunkSize);
-
-        while (dc.bufferedAmount > 8 * 1024 * 1024) {
-          await new Promise((r) => setTimeout(r, 20));
-        }
-
-        dc.send(slice);
-        fileSent += slice.byteLength;
-        totalSent += slice.byteLength;
-        offset += slice.byteLength;
-
-        const now = performance.now();
-        const dt = (now - lastT) / 1000;
-        if (dt > 0.4) {
-          const rate = (totalSent - lastSent) / dt;
-          updateOverall(rate, now);
-          lastSent = totalSent;
-          lastT = now;
-        }
-      }
+    // bufferedamountlow fires when bufferedAmount goes below bufferedAmountLowThreshold.
+    if (typeof dc.bufferedAmountLowThreshold === "number") {
+      dc.bufferedAmountLowThreshold = LOW_WATER;
     }
 
+    function waitForDrain(){
+      if (dc.bufferedAmount <= LOW_WATER) return Promise.resolve();
+      return new Promise((resolve) => {
+        const onLow = () => {
+          dc.removeEventListener("bufferedamountlow", onLow);
+          clearInterval(fallback);
+          resolve();
+        };
+        dc.addEventListener("bufferedamountlow", onLow);
+
+        // Fallback polling for browsers that don't reliably emit bufferedamountlow.
+        const fallback = setInterval(() => {
+          if (dc.bufferedAmount <= LOW_WATER) {
+            dc.removeEventListener("bufferedamountlow", onLow);
+            clearInterval(fallback);
+            resolve();
+          }
+        }, 50);
+      });
+    }
+
+    // Pipeline disk reads with sending.
+    let offset = 0;
+    let nextBufPromise = fileSize ? f.slice(0, Math.min(fileSize, chunkSize)).arrayBuffer() : Promise.resolve(new ArrayBuffer(0));
+
+    while (offset < fileSize) {
+      const buf = await nextBufPromise;
+      const len = buf.byteLength;
+
+      // Advance and kick off the next read as early as possible.
+      offset += len;
+      if (offset < fileSize) {
+        const end = Math.min(fileSize, offset + chunkSize);
+        nextBufPromise = f.slice(offset, end).arrayBuffer();
+      }
+
+      // Backpressure: let the data channel buffer fill, but pause before it gets too large.
+      while (dc.bufferedAmount > HIGH_WATER) {
+        await waitForDrain();
+      }
+
+      dc.send(buf);
+      fileSent += len;
+      totalSent += len;
+
+      const now = performance.now();
+      const dt = (now - lastT) / 1000;
+      if (dt > 0.4) {
+        const rate = (totalSent - lastSent) / dt;
+        updateOverall(rate, now);
+        lastSent = totalSent;
+        lastT = now;
+      }
+    }
     dc.send(JSON.stringify({ type: "file_done", index: i+1 }));
   }
 
