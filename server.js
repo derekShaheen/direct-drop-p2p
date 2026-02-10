@@ -17,6 +17,9 @@ const rooms = new Map();
 // In-memory metrics keyed by token (never exposed through admin endpoints)
 const metrics = new Map();
 
+// Public aggregate stats (in-memory)
+let successfulTransfers = 0;
+
 // Cleanup policy
 const TOKEN_TTL_MS = 48 * 60 * 60 * 1000;        // 48 hours
 const CLEANUP_POLL_MS = 5 * 60 * 1000;           // every 5 minutes
@@ -155,6 +158,7 @@ app.post("/api/metrics/ping", express.json(), (req, res) => {
     m.status = "transferring";
     if (!m.startedAt) m.startedAt = now();
   } else if (event === "success") {
+    if (!m.successCounted) { successfulTransfers += 1; m.successCounted = true; }
     m.status = "success";
     if (!m.endedAt) m.endedAt = now();
   } else if (event === "failed") {
@@ -167,6 +171,12 @@ app.post("/api/metrics/ping", express.json(), (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+
+// Public aggregate stats (no auth)
+app.get("/api/public-stats", (_req, res) => {
+  res.json({ successfulTransfers });
 });
 
 // --- Admin endpoints (token-hidden) ---

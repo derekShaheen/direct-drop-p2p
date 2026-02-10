@@ -16,6 +16,19 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+
+
+/* Background should extend with content (avoid visible cutoff on tall pages) */
+html, body {
+  min-height: 100%;
+}
+
+body {
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 *{ box-sizing:border-box; }
 html,body{
   padding-left: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left));
@@ -75,7 +88,7 @@ a:hover{ text-decoration:underline; }
   align-items:center;
   gap:8px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,.03);
+  background: transparent;
   padding: 8px 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -591,4 +604,19 @@ a:hover{ text-decoration:underline; }
   width: 0%;
   border-radius: 999px;
   background: rgba(114,164,242,1);
+}
+
+
+
+/* Public aggregate stats */
+.public-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  margin: 8px 0 14px 0;
+  font-size: 13px;
 }
