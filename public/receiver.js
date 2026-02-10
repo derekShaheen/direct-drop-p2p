@@ -4,24 +4,6 @@ import { $, setStatus, setProgress, fmtBytes, fmtRate } from "./ui.js";
 function safeText(el, value){ if (el) el.textContent = value; }
 
 
-async function refreshPublicStats(){
-  const el = document.getElementById("successCount");
-  if (!el) return;
-  try {
-    const r = await fetch("/api/public-stats");
-    const j = await r.json();
-    el.textContent = typeof j.successfulTransfers === "number" ? String(j.successfulTransfers) : "—";
-        const bt = document.getElementById("bytesTotal");
-        if (bt) bt.textContent = (typeof j.totalBytesTransferred === "number") ? fmtBytes(j.totalBytesTransferred) : "—";
-  } catch {
-    el.textContent = "—";
-        const bt = document.getElementById("bytesTotal");
-        if (bt) bt.textContent = "—";
-  }
-}
-
-refreshPublicStats();
-setInterval(refreshPublicStats, 15000);
 
 
 const statusTextEl = $("status");
