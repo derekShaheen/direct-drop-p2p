@@ -19,6 +19,7 @@ const metrics = new Map();
 
 // Public aggregate stats (in-memory)
 let successfulTransfers = 0;
+let totalBytesTransferred = 0;
 
 // Cleanup policy
 const TOKEN_TTL_MS = 48 * 60 * 60 * 1000;        // 48 hours
@@ -158,7 +159,7 @@ app.post("/api/metrics/ping", express.json(), (req, res) => {
     m.status = "transferring";
     if (!m.startedAt) m.startedAt = now();
   } else if (event === "success") {
-    if (!m.successCounted) { successfulTransfers += 1; m.successCounted = true; }
+    if (!m.successCounted) { successfulTransfers += 1; totalBytesTransferred += (typeof m.bytes === "number" ? m.bytes : 0); m.successCounted = true; }
     m.status = "success";
     if (!m.endedAt) m.endedAt = now();
   } else if (event === "failed") {
@@ -176,9 +177,8 @@ app.post("/api/metrics/ping", express.json(), (req, res) => {
 
 // Public aggregate stats (no auth)
 app.get("/api/public-stats", (_req, res) => {
-  res.json({ successfulTransfers });
+  res.json({ successfulTransfers, totalBytesTransferred });
 });
-
 // --- Admin endpoints (token-hidden) ---
 app.get("/api/stats", statsAuth, (_req, res) => {
   const rows = [...metrics.entries()].map(([token, m]) => ({

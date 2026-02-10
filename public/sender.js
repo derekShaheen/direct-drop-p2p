@@ -12,8 +12,12 @@ async function refreshPublicStats(){
     const r = await fetch("/api/public-stats");
     const j = await r.json();
     el.textContent = typeof j.successfulTransfers === "number" ? String(j.successfulTransfers) : "—";
+        const bt = document.getElementById("bytesTotal");
+        if (bt) bt.textContent = (typeof j.totalBytesTransferred === "number") ? fmtBytes(j.totalBytesTransferred) : "—";
   } catch {
     el.textContent = "—";
+        const bt = document.getElementById("bytesTotal");
+        if (bt) bt.textContent = "—";
   }
 }
 

@@ -610,6 +610,7 @@ a:hover{ text-decoration:underline; }
 
 /* Public aggregate stats */
 .public-stats {
+  flex-wrap: wrap;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -617,6 +618,6 @@ a:hover{ text-decoration:underline; }
   border-radius: 999px;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.10);
-  margin: 8px 0 14px 0;
+  margin: 10px 0 0 0;
   font-size: 13px;
 }
