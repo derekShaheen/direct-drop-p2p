@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DirectDrop — Receive</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+<div class="dd-page-padding">
+<div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brandline">
+          <img class="brandmark" src="/mark.svg" alt="" />
+          <div>
+            <h1>DirectDrop</h1>
+<div class="featurelist">
+          <div class="featureitem">
+            <svg viewBox="0 0 512 512" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-miterlimit="10">
+              <path d="M256 256s-48-96-126-96c-54.12 0-98 43-98 96s43.88 96 98 96c37.51 0 71-22.41 94-48m32-48s48 96 126 96c54.12 0 98-43 98-96s-43.88-96-98-96c-37.51 0-71 22.41-94 48"></path>
+            </svg>
+            <div>
+              <div class="ft">Direct transfer</div>
+              <div class="fd">Browser-to-browser delivery over WebRTC data channels.</div>
+            </div>
+          </div>
+          <div class="featureitem">
+            <svg viewBox="0 0 512 512" fill="currentColor">
+              <path d="M304 416h-96a32 32 0 01-32-32v-48a32 32 0 0132-32h96a32 32 0 0132 32v48a32 32 0 01-32 32z"></path>
+              <path d="M416 221.25V416a48 48 0 01-48 48H144a48 48 0 01-48-48V96a48 48 0 0148-48h98.75a32 32 0 0122.62 9.37l141.26 141.26a32 32 0 019.37 22.62z" fill="none" stroke="currentColor" stroke-width="32" stroke-linejoin="round"></path>
+            </svg>
+            <div>
+              <div class="ft">No cloud copy</div>
+              <div class="fd">File bytes are not stored on the service.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mast-card">
+        <div class="steps">
+          <div class="step">
+            <div class="n">1</div>
+            <div>
+              <div class="t">Review</div>
+              <div class="d">Confirm the file list and sizes.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="n">2</div>
+            <div>
+              <div class="t">Start</div>
+              <div class="d">Click Start download to consent and begin.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="n">3</div>
+            <div>
+              <div class="t">Save</div>
+              <div class="d">Save each file (or Save all once everything is ready).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Queue</h2>
+          <div class="status warn" id="statusWrap"><span class="dot"></span><span id="status">Connecting</span></div>
+        </div>
+        <div class="card-body">
+          <div class="stats">
+            <div class="stat">
+              <div class="label">Connection</div>
+              <div class="value" id="connState">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Data channel</div>
+              <div class="value" id="dcState">—</div>
+            </div>
+          </div>
+
+          <div class="sep"></div>
+
+          <div id="authBox" class="card" style="display:none; margin-top:12px;">
+            <div class="card-body">
+              <div class="row" style="justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-weight:650;">Passphrase required</div>
+                  <div class="small">Ask the sender for the passphrase to view the queue.</div>
+                </div>
+                <div class="row" style="gap:10px;">
+                  <input id="passIn" class="num" type="password" placeholder="Passphrase" style="width:220px;" autocomplete="off" />
+                  <button id="passGo" class="btn primary" type="button">Unlock</button>
+                </div>
+              </div>
+              <div class="small" id="authMsg" style="margin-top:10px;"></div>
+            </div>
+          </div>
+
+          <div id="saveOpts" style="display:none; margin-top:12px;">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <label class="row" style="gap:10px; align-items:center;">
+                <input id="streamToggle" type="checkbox" />
+                <span class="small">Stream saves to disk (best for large files)</span>
+              </label>
+              <div class="row" style="gap:10px;">
+                <button id="chooseFolder" class="btn" type="button">Choose folder</button>
+                <span id="folderLabel" class="small" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="queue" class="list" style="display:none;"></div>
+
+          <div class="row" style="margin-top: 12px; gap: 10px;">
+            <button id="startBtn" class="btn primary" style="display:none;" type="button">Start download</button>
+            <button id="saveAllBtn" class="btn" style="display:none;" type="button">Save all</button>
+          </div>
+
+          <div class="footer">Files transfer sequentially. Save links appear as each file completes.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Transfer</h2>
+          <div class="status" id="xferWrap"><span class="dot"></span><span id="xferStatus">Idle</span></div>
+        </div>
+        <div class="card-body">
+          <div class="progress"><div id="bar"></div></div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="label">Current file</div>
+              <div class="value" id="currentFile">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Progress</div>
+              <div class="value" id="progressText">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Rate</div>
+              <div class="value" id="rateText">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">If you’re testing on your own network, make sure the sender’s URL uses the same LAN IP you used to open the sender page.</div>
+</div>
+
+  </div>
+
+  <script type="module" src="/receiver.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DirectDrop — Send</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+<div class="dd-page-padding">
+<div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brandline">
+          <img class="brandmark" src="/mark.svg" alt="" />
+          <div>
+            <h1>DirectDrop</h1>
+<div class="featurelist">
+          <div class="featureitem">
+            <svg viewBox="0 0 512 512" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-miterlimit="10">
+              <path d="M256 256s-48-96-126-96c-54.12 0-98 43-98 96s43.88 96 98 96c37.51 0 71-22.41 94-48m32-48s48 96 126 96c54.12 0 98-43 98-96s-43.88-96-98-96c-37.51 0-71 22.41-94 48"></path>
+            </svg>
+            <div>
+              <div class="ft">Peer-to-peer</div>
+              <div class="fd">Transfers flow directly between browsers whenever possible.</div>
+            </div>
+          </div>
+          <div class="featureitem">
+            <svg viewBox="0 0 512 512" fill="currentColor">
+              <path d="M304 416h-96a32 32 0 01-32-32v-48a32 32 0 0132-32h96a32 32 0 0132 32v48a32 32 0 01-32 32z"></path>
+              <path d="M416 221.25V416a48 48 0 01-48 48H144a48 48 0 01-48-48V96a48 48 0 0148-48h98.75a32 32 0 0122.62 9.37l141.26 141.26a32 32 0 019.37 22.62z" fill="none" stroke="currentColor" stroke-width="32" stroke-linejoin="round"></path>
+            </svg>
+            <div>
+              <div class="ft">Nothing stored</div>
+              <div class="fd">Your file data is not uploaded to the server or kept online.</div>
+            </div>
+          </div>
+          <div class="featureitem">
+            <svg viewBox="0 0 512 512" fill="currentColor">
+              <path d="M432 208H288l32-192L80 304h144l-32 192z"></path>
+            </svg>
+            <div>
+              <div class="ft">Fast on good networks</div>
+              <div class="fd">Direct paths can be quick, especially on the same LAN.</div>
+            </div>
+          </div>
+          <div class="featureitem">
+            <svg viewBox="0 0 512 512" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M160 344h208a80.24 80.24 0 0080-80v-16"></path>
+              <path d="M352 168H144a80.24 80.24 0 00-80 80v16"></path>
+            </svg>
+            <div>
+              <div class="ft">Share link + QR</div>
+              <div class="fd">Receiver reviews the queue and starts when ready.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mast-card">
+        <div class="steps">
+          <div class="step">
+            <div class="n">1</div>
+            <div>
+              <div class="t">Add files</div>
+              <div class="d">Drag & drop, or browse and multi-select.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="n">2</div>
+            <div>
+              <div class="t">Create link</div>
+              <div class="d">Lock the queue and generate a link + QR code.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="n">3</div>
+            <div>
+              <div class="t">Receiver accepts</div>
+              <div class="d">They review the list and click Start. Files download sequentially.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Queue</h2>
+          <div class="status warn" id="statusWrap"><span class="dot"></span><span id="status">Add files to begin</span></div>
+        </div>
+        <div class="card-body">
+          <div id="drop" class="dropzone" tabindex="0">
+            <div>
+              <div class="title">Drag & drop files</div>
+              <div class="sub">Or click to browse (multi-select supported)</div>
+            </div>
+            <div class="icon">⇪</div>
+          </div>
+          <input id="file" type="file" hidden multiple />
+
+          <div class="sep"></div>
+
+          <div class="row" style="justify-content:space-between; align-items:center;">
+            <div class="row" style="gap:10px; align-items:center;">
+              <div class="small" style="min-width:120px;">Passphrase (optional)</div>
+              <input id="pass" class="num" type="password" placeholder="(optional)" style="width:220px;" autocomplete="off" />
+              <button id="togglePass" class="btn" type="button" style="padding:8px 10px; border-radius: 10px;">Show</button>
+            </div>
+          </div>
+
+          <div class="row" style="justify-content:space-between; align-items:center;">
+            <div class="small">Queue order is the download order. You can re-order until you create the share link.</div>
+            <div class="row">
+              <button class="btn primary" id="createBtn" disabled>Create share link</button>
+              <button class="btn danger" id="clearBtn" disabled>Clear</button>
+            </div>
+          </div>
+
+          <div id="queue" class="list" style="display:none;"></div>
+
+          <div class="sep"></div>
+
+          <div id="shareOut" style="display:none;">
+          <div class="kv">
+            <div class="k">Link</div>
+            <div class="v"><a id="link" href="#" class="mono">—</a></div>
+          </div>
+
+          <div class="row" style="margin-top:10px; gap:10px;">
+            <button class="btn primary" id="shareBtn" type="button" style="display:none;">Share</button>
+            <button class="btn" id="copyBtn" type="button">Copy link</button>
+      <a id="kofiInline" class="btn kofi-btn" href="https://ko-fi.com/M4M11T5GH5" target="_blank" rel="noopener" style="display:none;">Support us on Ko-fi</a>
+
+          </div>
+
+          <div class="row" style="margin-top:14px;">
+            <div class="qr" style="display:flex;align-items:center;justify-content:center; color: var(--muted); font-size: 12px;" id="qrWrap">
+              <span id="qrPlaceholder">QR will appear after you create the share link</span>
+              <img id="qr" alt="QR code" style="display:none; width:100%; height:100%; object-fit:contain; border-radius: 10px;" />
+            </div>
+            <div style="flex:1; min-width: 240px;">
+              <div class="stats">
+                <div class="stat">
+                  <div class="label">Peer</div>
+                  <div class="value" id="peerState">Not connected</div>
+                </div>
+                <div class="stat">
+                  <div class="label">Connection</div>
+                  <div class="value" id="connState">—</div>
+                </div>
+              </div>
+              <div class="footer">After the receiver accepts, files transfer sequentially from the queue.</div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="transferCard" style="display:none;">
+        <div class="card-header">
+          <h2>Transfer</h2>
+          <div class="status" id="xferWrap"><span class="dot"></span><span id="xferStatus">Idle</span></div>
+        </div>
+        <div class="card-body">
+          <div class="progress"><div id="bar"></div></div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="label">Current file</div>
+              <div class="value" id="currentFile">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Progress</div>
+              <div class="value" id="progressText">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Rate</div>
+              <div class="value" id="rateText">—</div>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top: 12px;">
+            <button class="btn danger" id="resetBtn" disabled>Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+
+  </div>
+
+  <script type="module" src="/sender.js"></script>
+</div>
+</body>
+</html>
