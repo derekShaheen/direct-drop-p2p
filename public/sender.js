@@ -558,15 +558,44 @@ async function sendQueueSequential(manifest, totalBytes){
   let fileSent = 0;
   let fileSize = 0;
 
+  // Smooth transfer rate and derived ETA to reduce jitter.
+  const rateSamples = [];
+  const maxRateSamples = 9;
+  let rateEma = 0;
+  let rateEmaInit = false;
+  let rateEmaLastT = performance.now();
+  const rateTau = 3.0; // seconds
+  function smoothRate(rawBps, now){
+    const raw = Math.max(0, rawBps || 0);
+    rateSamples.push(raw);
+    if (rateSamples.length > maxRateSamples) rateSamples.shift();
+    const sorted = [...rateSamples].sort((a,b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] || 0;
+    if (!rateEmaInit){
+      rateEmaInit = true;
+      rateEma = median;
+      rateEmaLastT = now || performance.now();
+      return rateEma;
+    }
+    const tNow = now || performance.now();
+    const dt = Math.max(0.001, (tNow - rateEmaLastT) / 1000);
+    rateEmaLastT = tNow;
+    const alpha = 1 - Math.exp(-dt / rateTau);
+    rateEma = rateEma + alpha * (median - rateEma);
+    return rateEma;
+  }
+
+
   
-function updateOverall(rateBps){
+  function updateOverall(rateBps, now){
     setProgress(barEl, totalBytes ? (totalSent / totalBytes) : 0);
     const filePart = fileSize ? `File: ${fmtBytes(fileSent)} / ${fmtBytes(fileSize)}` : "File: —";
     const totalPart = `Total: ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)}`;
     progressTextEl.textContent = `${filePart} • ${totalPart}`;
-    rateTextEl.textContent = fmtRate(rateBps || 0);
+    const smooth = smoothRate(rateBps, now);
+    rateTextEl.textContent = fmtRate(smooth);
 
-    const rate = rateBps || 0;
+    const rate = smooth;
     if (etaTotalEl) {
       const remaining = Math.max(0, totalBytes - totalSent);
       etaTotalEl.textContent = rate > 0 ? fmtETA(remaining / rate) : "—";
@@ -609,7 +638,7 @@ function updateOverall(rateBps){
         const dt = (now - lastT) / 1000;
         if (dt > 0.4) {
           const rate = (totalSent - lastSent) / dt;
-          updateOverall(rate);
+          updateOverall(rate, now);
           lastSent = totalSent;
           lastT = now;
         }

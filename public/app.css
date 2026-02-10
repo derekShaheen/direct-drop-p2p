@@ -428,7 +428,7 @@ a:hover{ text-decoration:underline; }
 .hero{ display:none; }
 
 .mast{
-  margin: 12px 0 18px;
+  margin: 12px 0 28px;
   display:grid;
   grid-template-columns: 1.25fr .75fr;
   gap: 14px;

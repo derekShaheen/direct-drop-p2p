@@ -108,25 +108,12 @@
             </div>
           </div>
 
-          <div id="saveOpts" style="display:none; margin-top:12px;">
-            <div class="row" style="justify-content:space-between; align-items:center;">
-              <label class="row" style="gap:10px; align-items:center;">
-                <input id="streamToggle" type="checkbox" />
-                <span class="small">Stream saves to disk (best for large files)</span>
-              </label>
-              <div class="row" style="gap:10px;">
-                <button id="chooseFolder" class="btn" type="button">Choose folder</button>
-                <span id="folderLabel" class="small" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
-              </div>
-            </div>
-          </div>
-
-          <div id="queue" class="list" style="display:none;"></div>
-
           <div class="row" style="margin-top: 12px; gap: 10px;">
             <button id="startBtn" class="btn primary" style="display:none;" type="button">Start download</button>
             <button id="saveAllBtn" class="btn" style="display:none;" type="button">Save all</button>
           </div>
+
+          <div id="queue" class="list" style="display:none;"></div>
 
           <div class="footer">Files transfer sequentially. Save links appear as each file completes.</div>
         </div>
@@ -165,8 +152,6 @@
         </div>
       </div>
     </div>
-
-    <div class="footer">If you’re testing on your own network, make sure the sender’s URL uses the same LAN IP you used to open the sender page.</div>
 </div>
 
   </div>
