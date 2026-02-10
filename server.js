@@ -30,7 +30,7 @@ const wss = new WebSocketServer({ server, path: "/signal" });
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 const STATS_FILE = process.env.PUBLIC_STATS_FILE
   ? process.env.PUBLIC_STATS_FILE
-  : path.join(process.cwd(), "public-stats.json");
+  : path.join(process.cwd(), process.env.RAILWAY_VOLUME_MOUNT_PATH + "/public-stats.json");
 
 const TOKEN_TTL_MS = 1000 * 60 * 60; // 1 hour
 const CLEANUP_POLL_MS = 1000 * 30;   // 30 seconds
