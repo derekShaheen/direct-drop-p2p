@@ -28,9 +28,14 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/signal" });
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
-const STATS_FILE = process.env.PUBLIC_STATS_FILE
-  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, "/public-stats.json")
-    : path.join(process.cwd(), "public-stats.json");
+const DEFAULT_STATS_FILE = path.join(process.cwd(), "public-stats.json");
+
+const STATS_FILE =
+  process.env.PUBLIC_STATS_FILE ||
+  (process.env.RAILWAY_VOLUME_MOUNT_PATH
+    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, "public-stats.json")
+    : DEFAULT_STATS_FILE);
+
 
 const TOKEN_TTL_MS = 1000 * 60 * 60; // 1 hour
 const CLEANUP_POLL_MS = 1000 * 30;   // 30 seconds
