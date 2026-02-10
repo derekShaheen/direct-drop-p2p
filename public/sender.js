@@ -614,13 +614,19 @@ async function sendQueueSequential(manifest, totalBytes){
     currentFileEl.textContent = `${i+1}/${queue.length} ${f.name}`;
     dc.send(JSON.stringify({ type: "meta", index: i+1, name: f.name, size: f.size, mime: f.type || "application/octet-stream" }));
 
+    // DataChannel backpressure + message sizing
+    // RTCDataChannel max message size varies by browser/transport; cap conservatively and
+    // use SCTP's reported maxMessageSize when available.
+    const sctpMax = (pc && pc.sctp && Number.isFinite(pc.sctp.maxMessageSize) && pc.sctp.maxMessageSize > 0)
+      ? pc.sctp.maxMessageSize
+      : 262144; // 256 KB fallback
 
-    // Use larger chunks and event-driven backpressure for higher throughput.
-    const chunkSize = 512 * 1024; // 512 KB
-    const HIGH_WATER = 64 * 1024 * 1024; // 64 MB buffered before pausing
-    const LOW_WATER  = 16 * 1024 * 1024; // resume once buffered drops below this
+    const chunkSize = Math.max(16384, Math.min(256 * 1024, Math.floor(sctpMax - 1024))); // keep headroom
 
-    // bufferedamountlow fires when bufferedAmount goes below bufferedAmountLowThreshold.
+    // Keep bufferedAmount under a safe ceiling to avoid silent send-queue stalls on some stacks.
+    const HIGH_WATER = 16 * 1024 * 1024; // 16 MB
+    const LOW_WATER  = 4 * 1024 * 1024;  // 4 MB
+
     if (typeof dc.bufferedAmountLowThreshold === "number") {
       dc.bufferedAmountLowThreshold = LOW_WATER;
     }
@@ -642,8 +648,57 @@ async function sendQueueSequential(manifest, totalBytes){
             clearInterval(fallback);
             resolve();
           }
-        }, 50);
+        }, 40);
       });
+    }
+
+    async function sendWithBackpressure(payload){
+      while (dc.bufferedAmount > HIGH_WATER) {
+        await waitForDrain();
+      }
+
+      try {
+        dc.send(payload);
+        return;
+      } catch (e) {
+        // Often indicates the internal send queue is saturated.
+        await waitForDrain();
+        while (dc.bufferedAmount > HIGH_WATER) {
+          await waitForDrain();
+        }
+
+        try {
+          dc.send(payload);
+          return;
+        } catch (e2) {
+          // Last resort: split to smaller pieces and send them through the same backpressure gate.
+          const u8 = payload instanceof ArrayBuffer
+            ? new Uint8Array(payload)
+            : new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
+
+          const sub = 64 * 1024;
+          for (let off = 0; off < u8.byteLength; off += sub) {
+            const end2 = Math.min(u8.byteLength, off + sub);
+            const slice = u8.subarray(off, end2);
+
+            while (dc.bufferedAmount > HIGH_WATER) {
+              await waitForDrain();
+            }
+
+            let ok = false;
+            for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+              try {
+                dc.send(slice);
+                ok = true;
+              } catch (e3) {
+                await waitForDrain();
+                await new Promise(r => setTimeout(r, 0));
+              }
+            }
+            if (!ok) throw e2;
+          }
+        }
+      }
     }
 
     // Pipeline disk reads with sending.
@@ -661,12 +716,9 @@ async function sendQueueSequential(manifest, totalBytes){
         nextBufPromise = f.slice(offset, end).arrayBuffer();
       }
 
-      // Backpressure: let the data channel buffer fill, but pause before it gets too large.
-      while (dc.bufferedAmount > HIGH_WATER) {
-        await waitForDrain();
-      }
+      // Send (respects backpressure and handles transient queue saturation).
+      await sendWithBackpressure(buf);
 
-      dc.send(buf);
       fileSent += len;
       totalSent += len;
 
