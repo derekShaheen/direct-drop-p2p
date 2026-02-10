@@ -118,8 +118,19 @@ pc = makePc();
 
 pc.onconnectionstatechange = () => {
   safeText(connStateEl, pc.connectionState);
-  if (pc.connectionState === "connected") setTopStatus("Connected", "ok");
-  if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+
+  if (pc.connectionState === "connected") {
+    setTopStatus("Connected", "ok");
+    return;
+  }
+
+  // "disconnected" can be transient on some browsers while transfers still continue.
+  if (pc.connectionState === "disconnected") {
+    setTopStatus("Connection hiccup", "warn");
+    return;
+  }
+
+  if (pc.connectionState === "failed") {
     setTopStatus("Connection problem", "bad");
     setXferStatus("Failed", "bad");
     ping("failed", { reason: pc.connectionState });

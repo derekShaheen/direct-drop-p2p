@@ -60,10 +60,14 @@ function formatBytesFromBytes(bytes) {
 function loadPublicStats() {
   try {
     const raw = fs.readFileSync(STATS_FILE, "utf-8");
-    const j = JSON.parse(raw);
-    return { successfulTransfers: typeof j.successfulTransfers === "number" ? j.successfulTransfers : 0, totalBytesTransferred: typeof j.totalBytesTransferred === "number" ? j.totalBytesTransferred : 0, filesTransferred: typeof j.filesTransferred === "number" ? j.filesTransferred : 0 };
+    const j = JSON.parse(raw || "{}");
+    return {
+      successfulTransfers: typeof j.successfulTransfers === "number" ? j.successfulTransfers : 0,
+      totalBytesTransferred: typeof j.totalBytesTransferred === "number" ? j.totalBytesTransferred : 0,
+      filesTransferred: typeof j.filesTransferred === "number" ? j.filesTransferred : 0
+    };
   } catch {
-    return { successfulTransfers: typeof j.successfulTransfers === "number" ? j.successfulTransfers : 0, totalBytesTransferred: typeof j.totalBytesTransferred === "number" ? j.totalBytesTransferred : 0, filesTransferred: typeof j.filesTransferred === "number" ? j.filesTransferred : 0 };
+    return { successfulTransfers: 0, totalBytesTransferred: 0, filesTransferred: 0 };
   }
 }
 
@@ -117,13 +121,8 @@ function safeSend(ws, obj) {
 
 // Pages rendered with embedded public stats (no stats API required)
 app.get("/", (_req, res) => {
-  try {
-    res.type("html").send(renderPage("index.html"));
-  } catch {
-    res.type("html").send(renderPage("sender.html"));
-  }
+  res.type("html").send(renderPage("sender.html"));
 });
-
 app.get("/sender.html", (_req, res) => {
   res.type("html").send(renderPage("sender.html"));
 });

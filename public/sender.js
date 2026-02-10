@@ -26,8 +26,6 @@ const shareBtn = $("shareBtn");
 const copyBtn = $("copyBtn");
 const kofiInline = document.getElementById("kofiInline");
 let kofiInitDone = false;
-
-const peerStateEl = $("peerState");
 const connStateEl = $("connState");
 const netEl = $("net");
 
@@ -53,13 +51,17 @@ function teardownPeer(){
   pc = null;
 }
 
+function setConnDisplay(text){
+  safeText(connStateEl, text);
+}
+
 function resetForReceiverRetry(){
   // Allow a receiver to reopen the same link without requiring a new token.
   teardownPeer();
   startedNegotiation = false;
   setTopStatus("Waiting for receiver", "warn");
   setXferStatus("Waiting", "warn");
-  safeText(peerStateEl, "Not connected");
+  setConnDisplay("Not connected");
 }
 
 let token, ws, pc, dc;
@@ -291,7 +293,7 @@ async function createShareLink(){
   lockQueue();
   resetBtn.disabled = true;
 
-  safeText(peerStateEl, "Not connected");
+  setConnDisplay("Not connected");
   safeText(connStateEl, "—");
   setNet("connecting");
 
@@ -305,13 +307,22 @@ async function createShareLink(){
   pc = makePc();
 
   pc.onconnectionstatechange = () => {
-    safeText(connStateEl, pc.connectionState);
+    // Single connection indicator:
+    // - If the receiver has opened the link but WebRTC isn't connected yet, show that.
+    // - Otherwise show the current peer connection state.
     if (pc.connectionState === "connected") {
-      safeText(peerStateEl, "Connected");
+      setConnDisplay("Connected");
       ping("connected", { bytes: totalBytes });
+      return;
     }
-    if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-      safeText(peerStateEl, pc.connectionState);
+
+    if (receiverPresent && pc.connectionState !== "failed") {
+      setConnDisplay("Receiver opened link");
+    } else {
+      setConnDisplay(pc.connectionState || "Not connected");
+    }
+
+    if (pc.connectionState === "failed") {
       setTopStatus("Connection problem", "bad");
       resetBtn.disabled = false;
       ping("failed", { reason: pc.connectionState });
@@ -526,7 +537,7 @@ async function onSignal(msg) {
   const wasPresent = receiverPresent;
   receiverPresent = !!msg.payload?.present;
 
-  safeText(peerStateEl, receiverPresent ? "Receiver opened link" : "Not connected");
+  setConnDisplay(receiverPresent ? "Receiver opened link" : "Not connected");
 
   // If a receiver closes the page before starting/finishing, allow them to retry with the same link.
   if (wasPresent && !receiverPresent && !transferCompleted) {
