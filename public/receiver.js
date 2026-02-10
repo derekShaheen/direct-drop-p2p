@@ -24,11 +24,6 @@ const passIn = $("passIn");
 const passGo = $("passGo");
 const authMsg = $("authMsg");
 
-const saveOpts = $("saveOpts");
-const streamToggle = $("streamToggle");
-const chooseFolderBtn = $("chooseFolder");
-const folderLabel = $("folderLabel");
-
 const barEl = $("bar");
 const progressTextEl = $("progressText");
 const rateTextEl = $("rateText");
@@ -47,11 +42,7 @@ let accepted = false;
 let hello = null;     // { passRequired, salt }
 let authOk = false;
 
-const supportsDirPicker = typeof window.showDirectoryPicker === "function";
-let streamEnabled = false;
-let dirHandle = null;
-let writable = null;
-let writeChain = Promise.resolve();
+	
 
 let receiving = null; // current file meta
 let buffers = [];
@@ -62,6 +53,40 @@ let totalReceived = 0;
 
 let lastBytes = 0;
 let lastT = performance.now();
+
+// Smooth transfer rate and derived ETA to reduce jitter.
+const rateSamples = [];
+const maxRateSamples = 9;
+let rateEma = 0;
+let rateEmaInit = false;
+let rateEmaLastT = performance.now();
+const rateTau = 3.0; // seconds
+function smoothRate(rawBps, now){
+  const raw = Math.max(0, rawBps || 0);
+  rateSamples.push(raw);
+  if (rateSamples.length > maxRateSamples) rateSamples.shift();
+  const sorted = [...rateSamples].sort((a,b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] || 0;
+  if (!rateEmaInit){
+    rateEmaInit = true;
+    rateEma = median;
+    rateEmaLastT = now || performance.now();
+    return rateEma;
+  }
+  const tNow = now || performance.now();
+  const dt = Math.max(0.001, (tNow - rateEmaLastT) / 1000);
+  rateEmaLastT = tNow;
+  const alpha = 1 - Math.exp(-dt / rateTau);
+  rateEma = rateEma + alpha * (median - rateEma);
+  return rateEma;
+}
+function resetRateSmoothing(){
+  rateSamples.length = 0;
+  rateEma = 0;
+  rateEmaInit = false;
+  rateEmaLastT = performance.now();
+}
+
 
 function setTopStatus(label, kind){
   setStatus(statusTextEl, label, kind);
@@ -124,25 +149,6 @@ saveAllBtn.addEventListener("click", async () => {
   }
 });
 
-streamToggle?.addEventListener("change", () => {
-  streamEnabled = !!streamToggle.checked;
-  if (streamEnabled && !supportsDirPicker) {
-    streamEnabled = false;
-    streamToggle.checked = false;
-  }
-  updateSaveAllState();
-});
-
-chooseFolderBtn?.addEventListener("click", async () => {
-  if (!supportsDirPicker) return;
-  try {
-    dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
-    folderLabel.textContent = dirHandle?.name || "";
-  } catch {
-    // user canceled
-  }
-});
-
 passGo?.addEventListener("click", async () => {
   if (!dc || !hello?.passRequired) return;
   const pass = (passIn.value || "").trim();
@@ -155,12 +161,11 @@ passGo?.addEventListener("click", async () => {
   dc.send(JSON.stringify({ type: "auth", digest }));
 });
 startBtn.addEventListener("click", async () => {
+  resetRateSmoothing();
+  lastBytes = totalReceived;
+  lastT = performance.now();
   if (!dc || !manifest) return;
   if (hello?.passRequired && !authOk) return;
-  if (streamEnabled && supportsDirPicker && !dirHandle) {
-    setTopStatus("Pick a folder to stream saves", "warn");
-    return;
-  }
   accepted = true;
   startBtn.disabled = true;
   startBtn.textContent = "Downloading…";
@@ -328,10 +333,6 @@ function updateSaveAllState(){
     saveAllBtn.style.display = "none";
     return;
   }
-  if (streamEnabled) {
-    saveAllBtn.style.display = "none";
-    return;
-  }
   saveAllBtn.style.display = "inline-flex";
   // enable only when all files have Save links visible
   const allReady = manifest.files.every(f => {
@@ -391,13 +392,6 @@ function setupChannel() {
 
         renderManifest();
         updateSaveAllState();
-        saveOpts.style.display = "block";
-        if (!supportsDirPicker) {
-          streamToggle.checked = false;
-          streamToggle.disabled = true;
-          chooseFolderBtn.disabled = true;
-          folderLabel.textContent = "";
-        }
 
         setTopStatus("Review queue", "warn");
         setXferStatus("Waiting for consent", "warn");
@@ -413,20 +407,10 @@ function setupChannel() {
         receiving = msg; // {index,name,size,mime}
         buffers = [];
         receivedForFile = 0;
-        writable = null;
-        writeChain = Promise.resolve();
+	        
         currentFileEl.textContent = `${msg.index}/${manifest.files.length} ${msg.name}`;
         setRowStatus(msg.index, "receiving");
         setRowProgress(msg.index, 0);
-
-        if (streamEnabled && supportsDirPicker && dirHandle) {
-          try {
-            const fh = await dirHandle.getFileHandle(msg.name, { create: true });
-            writable = await fh.createWritable();
-          } catch {
-            writable = null;
-          }
-        }
         return;
       }
 
@@ -447,11 +431,7 @@ function setupChannel() {
     if (!accepted || !receiving) return;
 
     const chunk = ev.data;
-    if (writable) {
-      writeChain = writeChain.then(() => writable.write(chunk));
-    } else {
-      buffers.push(chunk);
-    }
+	    buffers.push(chunk);
     receivedForFile += chunk.byteLength;
     totalReceived += chunk.byteLength;
 
@@ -464,17 +444,18 @@ function setupChannel() {
     const dt = (now - lastT) / 1000;
     if (dt > 0.4) {
       const rate = (totalReceived - lastBytes) / dt;
+      const smooth = smoothRate(rate, now);
       setProgress(barEl, totalBytes ? (totalReceived / totalBytes) : 0);
       progressTextEl.textContent = `${fmtBytes(totalReceived)} / ${fmtBytes(totalBytes)}`;
-      rateTextEl.textContent = fmtRate(rate);
+      rateTextEl.textContent = fmtRate(smooth);
       if (etaTotalEl) {
         const remaining = Math.max(0, totalBytes - totalReceived);
-        etaTotalEl.textContent = rate > 0 ? fmtETA(remaining / rate) : "—";
+        etaTotalEl.textContent = smooth > 0 ? fmtETA(remaining / smooth) : "—";
       }
       if (etaFileEl) {
         const fSize = receiving?.size || 0;
         const fRemaining = Math.max(0, fSize - receivedForFile);
-        etaFileEl.textContent = rate > 0 ? fmtETA(fRemaining / rate) : "—";
+        etaFileEl.textContent = smooth > 0 ? fmtETA(fRemaining / smooth) : "—";
       }
       lastBytes = totalReceived;
       lastT = now;
@@ -503,23 +484,16 @@ async function finalizeFile(index){
   const name = receiving?.name || `file_${index}`;
   const mime = receiving?.mime || "application/octet-stream";
 
-  if (writable) {
-    try { await writeChain; } catch {}
-    try { await writable.close(); } catch {}
-    setRowStatus(index, "saved");
-  } else {
-    const blob = new Blob(buffers, { type: mime });
-    const url = URL.createObjectURL(blob);
-    showSaveLink(index, url, name);
-    setRowStatus(index, "ready");
-  }
+	  const blob = new Blob(buffers, { type: mime });
+	  const url = URL.createObjectURL(blob);
+	  showSaveLink(index, url, name);
+	  setRowStatus(index, "ready");
 
   setRowProgress(index, 1);
   updateSaveAllState();
   receiving = null;
   buffers = [];
   receivedForFile = 0;
-  writable = null;
 
   if (manifest && index === manifest.files.length) {
     // last file
