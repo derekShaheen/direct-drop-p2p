@@ -497,7 +497,10 @@ async function createShareLink(){
 
     setXferStatus("Complete", "ok");
     transferCompleted = true;
-    await ping("success", { bytes: totalBytes });
+    await ping("success", {
+      bytes: totalBytes,
+      files: queue.length
+    }); 
     
     resetBtn.disabled = false;
   };
