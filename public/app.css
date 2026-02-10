@@ -581,6 +581,13 @@ a:hover{ text-decoration:underline; }
 
 
 
+/* Ko-fi button styling */
+.kofi-btn {
+  background: #72a4f2;
+  color: white;
+  text-decoration: none;
+}
+.kofi-btn:hover { filter: brightness(0.98); }
 
 
 
@@ -599,82 +606,24 @@ a:hover{ text-decoration:underline; }
   background: rgba(114,164,242,1);
 }
 
-
-
 /* Public aggregate stats */
 .public-stats {
-  flex-wrap: wrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
-  margin: 10px 0 0 0;
-  font-size: 13px;
-}
-
-.kofi-inline{margin-left:auto;}
-
-/* Ko‑fi placement + theme */
-.kofi-float {
   display: flex;
-  justify-content: flex-start;
-  margin-bottom: 10px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.kofi-float iframe,
-.kofi-float a,
-.kofi-float button {
-  max-height: 36px;
-}
-
-.kofi-btn {
-  background: linear-gradient(90deg, rgba(110,231,255,.18), rgba(167,139,250,.18));
-  color: rgba(255,255,255,.9);
-  border: 1px solid rgba(110,231,255,.25);
-}
-
-.kofi-btn:hover {
-  filter: brightness(1.05);
-}
-
-
-
-
-
-/* Ko-fi link placement */
-.kofi-top {
+.public-stats .stat-line {
   display: flex;
-  justify-content: flex-start;
-  margin: 6px 0 10px;
-}
-
-.kofi-link {
-  display: inline-flex;
+  justify-content: space-between;
   align-items: center;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.03);
-  box-shadow: 0 8px 18px rgba(0,0,0,.25);
+  white-space: nowrap;
 }
 
-.kofi-link:hover {
-  border-color: rgba(110,231,255,.25);
-  text-decoration: none;
+.public-stats .stat-line .label {
+  opacity: 0.85;
 }
 
-.kofi-img {
-  height: 36px;
-  width: auto;
-  border: 0;
-  display: block;
-  opacity: 0.92;
+.public-stats .stat-line .value {
+  font-weight: 600;
 }
-
-.kofi-link:hover .kofi-img {
-  opacity: 1;
-}
-

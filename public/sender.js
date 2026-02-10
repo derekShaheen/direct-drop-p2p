@@ -500,8 +500,7 @@ async function createShareLink(){
     await ping("success", {
       bytes: totalBytes,
       files: queue.length
-    });
-    
+    }); 
     
     resetBtn.disabled = false;
   };
