@@ -1,6 +1,6 @@
 import { makePc } from "./webrtc.js";
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm";
-import { $, setStatus, setProgress, fmtBytes, fmtRate } from "./ui.js";
+import { $, setStatus, setProgress, fmtBytes, fmtRate, fmtETA } from "./ui.js";
 
 function safeText(el, value){ if (el) el.textContent = value; }
 
@@ -39,6 +39,9 @@ const xferWrapEl = $("xferWrap");
 const barEl = $("bar");
 const progressTextEl = $("progressText");
 const rateTextEl = $("rateText");
+const etaTotalEl = $("etaTotal");
+const etaFileEl = $("etaFile");
+const etaFileStatEl = $("etaFileStat");
 const currentFileEl = $("currentFile");
 const resetBtn = $("resetBtn");
 
@@ -552,13 +555,25 @@ async function sendQueueSequential(manifest, totalBytes){
   let fileSent = 0;
   let fileSize = 0;
 
-  function updateOverall(rateBps){
+  
+function updateOverall(rateBps){
     setProgress(barEl, totalBytes ? (totalSent / totalBytes) : 0);
     const filePart = fileSize ? `File: ${fmtBytes(fileSent)} / ${fmtBytes(fileSize)}` : "File: —";
     const totalPart = `Total: ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)}`;
     progressTextEl.textContent = `${filePart} • ${totalPart}`;
     rateTextEl.textContent = fmtRate(rateBps || 0);
+
+    const rate = rateBps || 0;
+    if (etaTotalEl) {
+      const remaining = Math.max(0, totalBytes - totalSent);
+      etaTotalEl.textContent = rate > 0 ? fmtETA(remaining / rate) : "—";
+    }
+    if (etaFileEl) {
+      const fRemaining = Math.max(0, fileSize - fileSent);
+      etaFileEl.textContent = rate > 0 ? fmtETA(fRemaining / rate) : "—";
+    }
   }
+
 
   for (let i = 0; i < queue.length; i++) {
     const f = queue[i].file;

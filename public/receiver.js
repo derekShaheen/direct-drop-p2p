@@ -1,5 +1,5 @@
 import { makePc } from "./webrtc.js";
-import { $, setStatus, setProgress, fmtBytes, fmtRate } from "./ui.js";
+import { $, setStatus, setProgress, fmtBytes, fmtRate, fmtETA } from "./ui.js";
 
 function safeText(el, value){ if (el) el.textContent = value; }
 
@@ -32,6 +32,9 @@ const folderLabel = $("folderLabel");
 const barEl = $("bar");
 const progressTextEl = $("progressText");
 const rateTextEl = $("rateText");
+const etaTotalEl = $("etaTotal");
+const etaFileEl = $("etaFile");
+const etaFileStatEl = $("etaFileStat");
 const currentFileEl = $("currentFile");
 
 const token = location.pathname.split("/").pop();
@@ -174,6 +177,8 @@ function renderManifest(){
   if (!manifest) return;
   queueEl.style.display = "block";
   queueEl.innerHTML = "";
+
+  if (etaFileStatEl) etaFileStatEl.style.display = (manifest.length > 1) ? "" : "none";
 
   manifest.files.forEach((f) => {
     const row = document.createElement("div");
@@ -462,6 +467,15 @@ function setupChannel() {
       setProgress(barEl, totalBytes ? (totalReceived / totalBytes) : 0);
       progressTextEl.textContent = `${fmtBytes(totalReceived)} / ${fmtBytes(totalBytes)}`;
       rateTextEl.textContent = fmtRate(rate);
+      if (etaTotalEl) {
+        const remaining = Math.max(0, totalBytes - totalReceived);
+        etaTotalEl.textContent = rate > 0 ? fmtETA(remaining / rate) : "—";
+      }
+      if (etaFileEl) {
+        const fSize = receiving?.size || 0;
+        const fRemaining = Math.max(0, fSize - receivedForFile);
+        etaFileEl.textContent = rate > 0 ? fmtETA(fRemaining / rate) : "—";
+      }
       lastBytes = totalReceived;
       lastT = now;
     }

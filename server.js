@@ -44,18 +44,26 @@ const metrics = new Map();
 
 function now() { return Date.now(); }
 
+function formatBytesFromBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B","KB","MB","GB","TB","PB"];
+  let v = bytes;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  const dec = v >= 100 || i === 0 ? 0 : (v >= 10 ? 1 : 2);
+  return `${v.toFixed(dec)} ${units[i]}`;
+}
+
+
 
 
 function loadPublicStats() {
   try {
     const raw = fs.readFileSync(STATS_FILE, "utf-8");
     const j = JSON.parse(raw);
-    return {
-      successfulTransfers: typeof j.successfulTransfers === "number" ? j.successfulTransfers : 0,
-      totalBytesTransferred: typeof j.totalBytesTransferred === "number" ? j.totalBytesTransferred : 0
-    };
+    return { successfulTransfers: typeof j.successfulTransfers === "number" ? j.successfulTransfers : 0, totalBytesTransferred: typeof j.totalBytesTransferred === "number" ? j.totalBytesTransferred : 0, filesTransferred: typeof j.filesTransferred === "number" ? j.filesTransferred : 0 };
   } catch {
-    return { successfulTransfers: 0, totalBytesTransferred: 0 };
+    return { successfulTransfers: typeof j.successfulTransfers === "number" ? j.successfulTransfers : 0, totalBytesTransferred: typeof j.totalBytesTransferred === "number" ? j.totalBytesTransferred : 0, filesTransferred: typeof j.filesTransferred === "number" ? j.filesTransferred : 0 };
   }
 }
 
@@ -73,7 +81,8 @@ function renderPage(fileName) {
   const filePath = path.join(PUBLIC_DIR, fileName);
   let html = fs.readFileSync(filePath, "utf-8");
   html = html.replace(/id="successCount">[^<]*</, `id="successCount">${publicStats.successfulTransfers}<`);
-  html = html.replace(/id="bytesTotal">[^<]*</, `id="bytesTotal">${formatBitsFromBytes(publicStats.totalBytesTransferred)}<`);
+  html = html.replace(/id="filesTotal">[^<]*</, `id="filesTotal">${publicStats.filesTransferred}<`);
+  html = html.replace(/id="bytesTotal">[^<]*</, `id="bytesTotal">${formatBytesFromBytes(publicStats.totalBytesTransferred)}<`);
   return html;
 }
 
@@ -146,7 +155,7 @@ app.get("/t/:token", (req, res) => {
 });
 
 app.post("/api/metrics/ping", express.json(), (req, res) => {
-  const { token, event, bytes, reason } = req.body || {};
+  const { token, event, bytes, files, reason } = req.body || {};
   if (!token || typeof token !== "string") {
     res.status(400).json({ ok: false });
     return;
@@ -160,6 +169,7 @@ app.post("/api/metrics/ping", express.json(), (req, res) => {
 
   m.lastSeenAt = now();
   if (typeof bytes === "number") m.bytes = bytes;
+  if (typeof files === "number") m.files = files;
 
   if (event === "connected") {
     m.status = m.status === "success" ? "success" : "connected";
@@ -176,6 +186,7 @@ app.post("/api/metrics/ping", express.json(), (req, res) => {
     if (!m.successCounted) {
       publicStats.successfulTransfers += 1;
       publicStats.totalBytesTransferred += (typeof m.bytes === "number" ? m.bytes : 0);
+      publicStats.filesTransferred += (typeof m.files === "number" ? m.files : 0);
       m.successCounted = true;
       savePublicStats();
     }

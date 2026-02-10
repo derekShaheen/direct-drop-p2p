@@ -18,6 +18,24 @@ export function fmtBytes(n){
   return `${x.toFixed(i===0?0:2)} ${u[i]}`;
 }
 
-export function fmtRate(bps){
-  return `${fmtBytes(bps)}/s`;
+
+
+export function fmtETA(seconds){
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+  return `${m}:${String(ss).padStart(2,"0")}`;
+}
+
+export function fmtRate(bytesPerSec){
+  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return "—";
+  let bitsPerSec = bytesPerSec * 8;
+  const u=["b/s","Kb/s","Mb/s","Gb/s","Tb/s","Pb/s"];
+  let i=0,x=bitsPerSec;
+  while(x>=1000 && i<u.length-1){ x/=1000; i++; }
+  const dec = x>=100 ? 0 : (x>=10 ? 1 : 2);
+  return `${x.toFixed(dec)} ${u[i]}`;
 }

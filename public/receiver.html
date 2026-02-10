@@ -41,7 +41,11 @@
 
       <div class="mast-card">
         <div class="steps">
-      <div class="public-stats" id="publicStats">Successful transfers: <span id="successCount">—</span> · Data transferred: <span id="bytesTotal">—</span></div>
+      <div class="public-stats" id="publicStats">
+<div class="stat-line"><span class="label">Successful Transfers</span><span class="value" id="successCount">0</span></div>
+<div class="stat-line"><span class="label">Data Transferred</span><span class="value" id="bytesTotal">0 B</span></div>
+<div class="stat-line"><span class="label">Files Transferred</span><span class="value" id="filesTotal">0</span></div>
+</div>
 
           <div class="step">
             <div class="n">1</div>
@@ -148,6 +152,14 @@
             <div class="stat">
               <div class="label">Rate</div>
               <div class="value" id="rateText">—</div>
+            </div>
+            <div class="stat" id="etaFileStat" style="display:none;">
+              <div class="label">File ETA</div>
+              <div class="value" id="etaFile">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total ETA</div>
+              <div class="value" id="etaTotal">—</div>
             </div>
           </div>
         </div>

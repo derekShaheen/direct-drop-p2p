@@ -606,18 +606,24 @@ a:hover{ text-decoration:underline; }
   background: rgba(114,164,242,1);
 }
 
-
-
 /* Public aggregate stats */
 .public-stats {
-  flex-wrap: wrap;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.public-stats .stat-line {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
-  margin: 10px 0 0 0;
-  font-size: 13px;
+  white-space: nowrap;
+}
+
+.public-stats .stat-line .label {
+  opacity: 0.85;
+}
+
+.public-stats .stat-line .value {
+  font-weight: 600;
 }
