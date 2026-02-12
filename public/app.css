@@ -104,6 +104,7 @@ a:hover{ text-decoration:underline; }
   grid-template-columns: 1.2fr .8fr;
   gap: 14px;
   align-items: stretch;
+  padding-top: 10px;
 }
 @media (max-width: 920px){
   .grid{ grid-template-columns: 1fr; }
