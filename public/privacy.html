@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DirectDrop — Privacy Policy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+  <div class="dd-page-padding">
+    <div class="container privacy-page">
+      <div class="topbar">
+        <div class="brand">
+          <div class="brandline">
+            <img class="brandmark" src="/mark.svg" alt="" />
+            <div>
+              <a class="brand" href="/sender.html" aria-label="DirectDrop home"><h1>DirectDrop</h1></a>
+              <p>Privacy Policy</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Privacy Policy</h2>
+        </div>
+        <div class="card-body privacy-copy">
+          <p><strong>Effective date:</strong> 2026-02-12</p>
+
+          <p>
+            DirectDrop is designed for private, browser-to-browser file sharing. This policy explains what we do and do not process.
+          </p>
+
+          <h3>What we do <em>not</em> collect or store</h3>
+          <ul>
+            <li>We do not upload, inspect, store, or retain your file contents on our server.</li>
+            <li>We do not create user accounts.</li>
+            <li>We do not store personal profiles, contact lists, or message history.</li>
+            <li>We do not persist transfer manifests (file names and sizes) as a long-term server record.</li>
+          </ul>
+
+          <h3>How transfers work</h3>
+          <ul>
+            <li>File bytes move directly between sender and receiver browsers over WebRTC data channels.</li>
+            <li>The server only helps peers connect by relaying signaling messages needed to establish the direct connection.</li>
+            <li>WebRTC transport is encrypted in transit.</li>
+          </ul>
+
+          <h3>What limited data is processed</h3>
+          <ul>
+            <li><strong>Temporary connection state:</strong> short-lived room tokens and in-memory signaling/transfer state used to coordinate a live transfer session.</li>
+            <li><strong>Public aggregate counters:</strong> total successful transfers, total files transferred, and total bytes transferred across all users.</li>
+          </ul>
+
+          <p>
+            These aggregate counters are not user-specific and are intended only as public service statistics.
+          </p>
+
+          <h3>Retention</h3>
+          <ul>
+            <li>Temporary in-memory transfer/session state expires automatically and is cleaned up on a short time window.</li>
+            <li>Only aggregate counters are persisted for display on the site.</li>
+          </ul>
+
+          <h3>Contact</h3>
+          <p>
+            If this deployment provides a support channel, use that channel for privacy questions related to this service.
+          </p>
+
+          <p class="small">This policy describes the DirectDrop application behavior in this repository and its default server configuration.</p>
+
+          <div class="row" style="margin-top: 14px;">
+            <a class="btn" href="/sender.html">Back to app</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

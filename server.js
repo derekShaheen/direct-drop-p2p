@@ -136,6 +136,10 @@ app.get("/receiver.html", (_req, res) => {
   res.type("html").send(renderPage("receiver.html"));
 });
 
+app.get("/privacy", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "privacy.html"));
+});
+
 app.get("/api/create", (_req, res) => {
   const token = crypto.randomBytes(16).toString("hex");
   rooms.set(token, {

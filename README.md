@@ -93,6 +93,21 @@ Public totals are persisted in `PUBLIC_STATS_FILE` and injected into `sender.htm
 
 They increment when a transfer completes successfully (clients post a `success` event to `/api/metrics/ping`).
 
+
+## Privacy
+
+DirectDrop is built with a privacy-first model:
+
+- File contents are not uploaded to or stored by the server.
+- Transfers happen directly between browsers using WebRTC data channels.
+- The server keeps only short-lived in-memory session/signaling state needed for active transfers.
+- The only persisted data is non-identifying public aggregate counters:
+  - successful transfers
+  - files transferred
+  - total bytes transferred
+
+A human-readable privacy policy page is available at `/privacy`.
+
 ## Token lifecycle
 
 - Tokens have a TTL of **1 hour** while still in the initial `created` state (no completed transfer).

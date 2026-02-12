@@ -627,3 +627,29 @@ a:hover{ text-decoration:underline; }
 .public-stats .stat-line .value {
   font-weight: 600;
 }
+
+.privacy-link {
+  margin-top: 14px;
+  text-align: center;
+}
+
+.privacy-page {
+  max-width: 900px;
+}
+
+.privacy-copy h3 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.privacy-copy p,
+.privacy-copy li {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.privacy-copy ul {
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
