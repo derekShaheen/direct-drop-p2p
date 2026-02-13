@@ -13,6 +13,7 @@ const fileInput = $("file");
 const createBtn = $("createBtn");
 const clearBtn = $("clearBtn");
 const queueEl = $("queue");
+const queueControlsRow = $("queueControlsRow");
 const shareOut = document.getElementById("shareOut");
 const transferCard = document.getElementById("transferCard");
 
@@ -182,6 +183,7 @@ function lockQueue(){
 
   drop.style.display = "none";
   fileInput.style.display = "none";
+  if (queueControlsRow) queueControlsRow.style.display = "none";
 
   if (shareOut) shareOut.style.display = "block";
   if (transferCard) transferCard.style.display = "block";
