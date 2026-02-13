@@ -75,21 +75,22 @@ a:hover{ text-decoration:underline; }
   display: inline-block;
   color: transparent;
   background-image: linear-gradient(
-    105deg,
-    rgba(255,255,255,.88) 0%,
-    rgba(255,255,255,.88) 38%,
-    rgba(110,231,255,.98) 50%,
-    rgba(167,139,250,.95) 56%,
-    rgba(255,255,255,.88) 68%,
-    rgba(255,255,255,.88) 100%
+    100deg,
+    rgba(255,255,255,.9) 0%,
+    rgba(255,255,255,.9) 47%,
+    rgba(110,231,255,.98) 49.5%,
+    rgba(167,139,250,.95) 50%,
+    rgba(110,231,255,.98) 50.5%,
+    rgba(255,255,255,.9) 53%,
+    rgba(255,255,255,.9) 100%
   );
-  background-size: 420% 100%;
+  background-size: 240% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   text-shadow:
     0 0 16px rgba(110,231,255,.2),
     0 0 24px rgba(167,139,250,.13);
-  animation: directdrop-glow 8.5s cubic-bezier(.4,0,.2,1) infinite;
+  animation: directdrop-glow 9s linear infinite;
 }
 
 .brand h1 a.brand:hover{
@@ -98,21 +99,21 @@ a:hover{ text-decoration:underline; }
 
 @keyframes directdrop-glow {
   0%,
-  22% {
-    background-position: 260% 50%;
+  24% {
+    background-position: 160% 50%;
   }
-  74% {
-    background-position: -260% 50%;
+  76% {
+    background-position: -160% 50%;
   }
   100% {
-    background-position: -260% 50%;
+    background-position: -160% 50%;
   }
 }
 
 @media (prefers-reduced-motion: reduce){
   .brand h1 a.brand{
     animation: none;
-    background-position: 260% 50%;
+    background-position: 160% 50%;
   }
 }
 
