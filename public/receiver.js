@@ -39,6 +39,8 @@ let wsReconnectTimer = null;
 
 let manifest = null;  // { files: [{index,name,size,mime}], totalBytes }
 let accepted = false;
+let selectedFileIndexes = new Set();
+let selectedOrder = [];
 
 let hello = null;     // { passRequired, salt }
 let authOk = false;
@@ -174,6 +176,32 @@ startBtn.addEventListener("click", async () => {
   lastT = performance.now();
   if (!dc || !manifest) return;
   if (hello?.passRequired && !authOk) return;
+  const selected = manifest.files
+    .filter((f) => {
+      const box = document.getElementById(`pick_${f.index}`);
+      return !!box?.checked;
+    })
+    .map((f) => f.index);
+
+  if (!selected.length) {
+    setTopStatus("Select at least one file", "bad");
+    setXferStatus("Waiting for selection", "warn");
+    return;
+  }
+
+  selectedFileIndexes = new Set(selected);
+  selectedOrder = selected;
+  totalBytes = manifest.files
+    .filter((f) => selectedFileIndexes.has(f.index))
+    .reduce((a, f) => a + (f.size || 0), 0);
+
+  manifest.files.forEach((f) => {
+    if (!selectedFileIndexes.has(f.index)) {
+      setRowStatus(f.index, "skipped");
+      setRowProgress(f.index, 0);
+    }
+  });
+
   accepted = true;
   startBtn.disabled = true;
   startBtn.textContent = "Downloading…";
@@ -182,7 +210,7 @@ startBtn.addEventListener("click", async () => {
   setProgress(barEl, 0);
   progressTextEl.textContent = `0 / ${fmtBytes(totalBytes)}`;
   rateTextEl.textContent = "—";
-  dc.send(JSON.stringify({ type: "ready" }));
+  dc.send(JSON.stringify({ type: "ready", selected }));
   await ping("accepted", { bytes: totalBytes });
 });
 
@@ -191,7 +219,7 @@ function renderManifest(){
   queueEl.style.display = "block";
   queueEl.innerHTML = "";
 
-  if (etaFileStatEl) etaFileStatEl.style.display = (manifest.length > 1) ? "" : "none";
+  if (etaFileStatEl) etaFileStatEl.style.display = (manifest.files.length > 1) ? "" : "none";
 
   manifest.files.forEach((f) => {
     const row = document.createElement("div");
@@ -199,6 +227,7 @@ function renderManifest(){
     row.id = `row_${f.index}`;
     row.innerHTML = `
       <span class="badge">${f.index}</span>
+      <input id="pick_${f.index}" type="checkbox" checked title="Download this file" aria-label="Download ${escapeHtml(f.name)}" />
       <div class="grow">
         <div style="font-weight:650; overflow-wrap:anywhere;">${escapeHtml(f.name)}</div>
         <div class="small">${fmtBytes(f.size)}</div>
@@ -337,14 +366,24 @@ async function sha256Hex(text){
 
 
 function updateSaveAllState(){
-  if (!manifest || manifest.files.length <= 1) {
+  if (!manifest) {
     saveAllBtn.style.display = "none";
     return;
   }
+
+  const activeIndexes = (accepted && selectedFileIndexes.size)
+    ? selectedFileIndexes
+    : new Set(manifest.files.map((f) => f.index));
+
+  if (activeIndexes.size <= 1) {
+    saveAllBtn.style.display = "none";
+    return;
+  }
+
   saveAllBtn.style.display = "inline-flex";
-  // enable only when all files have Save links visible
-  const allReady = manifest.files.every(f => {
-    const a = document.getElementById(`dl_${f.index}`);
+  // enable only when all downloadable (selected) files have Save links visible
+  const allReady = [...activeIndexes].every((idx) => {
+    const a = document.getElementById(`dl_${idx}`);
     return a && a.style.display !== "none";
   });
   saveAllBtn.disabled = !allReady;
@@ -401,6 +440,9 @@ function setupChannel() {
         renderManifest();
         updateSaveAllState();
 
+        selectedFileIndexes = new Set(msg.files.map((f) => f.index));
+        selectedOrder = msg.files.map((f) => f.index);
+
         setTopStatus("Review queue", "warn");
         setXferStatus("Waiting for consent", "warn");
         startBtn.style.display = "inline-flex";
@@ -416,7 +458,8 @@ function setupChannel() {
         buffers = [];
         receivedForFile = 0;
 	        
-        currentFileEl.textContent = `${msg.index}/${manifest.files.length} ${msg.name}`;
+        const ordinal = Math.max(1, selectedOrder.indexOf(msg.index) + 1);
+        currentFileEl.textContent = `${ordinal}/${Math.max(1, selectedOrder.length)} ${msg.name}`;
         setRowStatus(msg.index, "receiving");
         setRowProgress(msg.index, 0);
         return;

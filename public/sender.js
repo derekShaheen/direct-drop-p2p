@@ -442,6 +442,7 @@ async function createShareLink(){
     dc.binaryType = "arraybuffer";
 
     let receiverReady = false;
+    let selectedIndexes = null;
     dc.onmessage = async (ev) => {
     if (typeof ev.data !== "string") return;
     let msg;
@@ -467,6 +468,16 @@ async function createShareLink(){
     }
 
     if (msg.type === "ready") {
+      if (Array.isArray(msg.selected)) {
+        const allowed = new Set(manifest.map((f) => f.index));
+        const uniq = [];
+        for (const raw of msg.selected) {
+          const idx = Number(raw);
+          if (!Number.isInteger(idx) || !allowed.has(idx) || uniq.includes(idx)) continue;
+          uniq.push(idx);
+        }
+        selectedIndexes = uniq;
+      }
       receiverReady = true;
       return;
     }
@@ -580,6 +591,17 @@ async function createShareLink(){
     await ping("waiting_consent", { bytes: totalBytes });
     }
 
+  function getSelectionStats(){
+    const selectedSet = new Set(Array.isArray(selectedIndexes) && selectedIndexes.length
+      ? selectedIndexes
+      : manifest.map((f) => f.index));
+    const selectedFiles = manifest.filter((f) => selectedSet.has(f.index));
+    return {
+      files: selectedFiles.length,
+      bytes: selectedFiles.reduce((a, f) => a + (f.size || 0), 0),
+    };
+  }
+
     dc.onopen = async () => {
     const saltHex = passSalt ? bufToHex(passSalt) : "";
     safeSendJson({ type: "hello", passRequired, salt: saltHex });
@@ -603,16 +625,18 @@ async function createShareLink(){
     }
 
     setTopStatus("Receiver accepted", "ok");
-    await ping("accepted", { bytes: totalBytes });
+    const selectionStats = getSelectionStats();
+    await ping("accepted", { bytes: selectionStats.bytes });
 
     setXferStatus("Transferring", "warn");
-    await sendQueueSequential(manifest, totalBytes);
+    await sendQueueSequential(manifest, totalBytes, selectedIndexes);
 
     setXferStatus("Complete", "ok");
     transferCompleted = true;
+    const selectionStatsDone = getSelectionStats();
     await ping("success", {
-      bytes: totalBytes,
-      files: queue.length
+      bytes: selectionStatsDone.bytes,
+      files: selectionStatsDone.files
     }); 
     
     resetBtn.disabled = false;
@@ -714,7 +738,7 @@ async function onSignal(msg) {
   }
 }
 
-async function sendQueueSequential(manifest, totalBytes){
+async function sendQueueSequential(manifest, totalBytes, selectedIndexes){
   // Overall progress is total bytes sent across all files.
   let totalSent = 0;
   let lastSent = 0;
@@ -751,18 +775,25 @@ async function sendQueueSequential(manifest, totalBytes){
   }
 
 
+  const selectedSet = new Set(Array.isArray(selectedIndexes) && selectedIndexes.length
+    ? selectedIndexes
+    : manifest.map((f) => f.index));
+
+  const filesToSend = manifest.filter((f) => selectedSet.has(f.index));
+  const selectedTotalBytes = filesToSend.reduce((a, f) => a + (f.size || 0), 0);
+
   
   function updateOverall(rateBps, now){
-    setProgress(barEl, totalBytes ? (totalSent / totalBytes) : 0);
+    setProgress(barEl, selectedTotalBytes ? (totalSent / selectedTotalBytes) : 0);
     const filePart = fileSize ? `File: ${fmtBytes(fileSent)} / ${fmtBytes(fileSize)}` : "File: —";
-    const totalPart = `Total: ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)}`;
+    const totalPart = `Total: ${fmtBytes(totalSent)} / ${fmtBytes(selectedTotalBytes)}`;
     progressTextEl.textContent = `${filePart} • ${totalPart}`;
     const smooth = smoothRate(rateBps, now);
     rateTextEl.textContent = fmtRate(smooth);
 
     const rate = smooth;
     if (etaTotalEl) {
-      const remaining = Math.max(0, totalBytes - totalSent);
+      const remaining = Math.max(0, selectedTotalBytes - totalSent);
       etaTotalEl.textContent = rate > 0 ? fmtETA(remaining / rate) : "—";
     }
     if (etaFileEl) {
@@ -772,12 +803,15 @@ async function sendQueueSequential(manifest, totalBytes){
   }
 
 
-  for (let i = 0; i < queue.length; i++) {
-    const f = queue[i].file;
+  for (let i = 0; i < filesToSend.length; i++) {
+    const mf = filesToSend[i];
+    const q = queue[mf.index - 1];
+    if (!q?.file) continue;
+    const f = q.file;
     fileSent = 0;
     fileSize = f.size || 0;
-    currentFileEl.textContent = `${i+1}/${queue.length} ${f.name}`;
-    dc.send(JSON.stringify({ type: "meta", index: i+1, name: f.name, size: f.size, mime: f.type || "application/octet-stream" }));
+    currentFileEl.textContent = `${i+1}/${filesToSend.length} ${f.name}`;
+    dc.send(JSON.stringify({ type: "meta", index: mf.index, name: f.name, size: f.size, mime: f.type || "application/octet-stream" }));
 
     // DataChannel backpressure + message sizing
     // RTCDataChannel max message size varies by browser/transport; cap conservatively and
@@ -896,12 +930,12 @@ async function sendQueueSequential(manifest, totalBytes){
         lastT = now;
       }
     }
-    dc.send(JSON.stringify({ type: "file_done", index: i+1 }));
+    dc.send(JSON.stringify({ type: "file_done", index: mf.index }));
   }
 
   // Final overall update
   setProgress(barEl, 1);
-  progressTextEl.textContent = `File: — • Total: ${fmtBytes(totalBytes)} / ${fmtBytes(totalBytes)}`;
+  progressTextEl.textContent = `File: — • Total: ${fmtBytes(selectedTotalBytes)} / ${fmtBytes(selectedTotalBytes)}`;
   rateTextEl.textContent = "done";
   currentFileEl.textContent = "—";
   dc.send(JSON.stringify({ type: "done" }));
