@@ -83,13 +83,13 @@ a:hover{ text-decoration:underline; }
     rgba(255,255,255,.88) 68%,
     rgba(255,255,255,.88) 100%
   );
-  background-size: 340% 100%;
+  background-size: 420% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   text-shadow:
     0 0 16px rgba(110,231,255,.2),
     0 0 24px rgba(167,139,250,.13);
-  animation: directdrop-glow 5.2s linear infinite;
+  animation: directdrop-glow 8.5s cubic-bezier(.4,0,.2,1) infinite;
 }
 
 .brand h1 a.brand:hover{
@@ -98,24 +98,21 @@ a:hover{ text-decoration:underline; }
 
 @keyframes directdrop-glow {
   0%,
-  18% {
-    background-position: 220% 50%;
-    filter: drop-shadow(0 0 0 rgba(110,231,255,.0));
+  22% {
+    background-position: 260% 50%;
   }
-  76% {
-    background-position: -220% 50%;
-    filter: drop-shadow(0 0 8px rgba(167,139,250,.3));
+  74% {
+    background-position: -260% 50%;
   }
   100% {
-    background-position: -220% 50%;
-    filter: drop-shadow(0 0 0 rgba(110,231,255,.0));
+    background-position: -260% 50%;
   }
 }
 
 @media (prefers-reduced-motion: reduce){
   .brand h1 a.brand{
     animation: none;
-    background-position: 220% 50%;
+    background-position: 260% 50%;
   }
 }
 
