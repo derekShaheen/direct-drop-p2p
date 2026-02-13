@@ -70,6 +70,18 @@ a:hover{ text-decoration:underline; }
   align-items: center;
 }
 
+.brand h1 .brand{
+  color: #fff;
+  text-shadow:
+    0 0 10px rgba(255,255,255,.75),
+    0 0 22px rgba(110,231,255,.45);
+}
+
+.brand h1 .brand:hover{
+  color: #fff;
+  text-decoration: none;
+}
+
 .brand p{
   margin:6px 0 0;
   color: var(--muted);
