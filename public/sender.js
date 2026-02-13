@@ -57,6 +57,7 @@ function setConnDisplay(text){
 
 function resetForReceiverRetry(){
   // Allow a receiver to reopen the same link without requiring a new token.
+  teardownPeer();
   startedNegotiation = false;
   setTopStatus("Waiting for receiver", "warn");
   setXferStatus("Waiting", "warn");
@@ -71,6 +72,7 @@ let startedNegotiation = false;
 let locked = false;
 let wsReconnectTimer = null;
 let pendingSignals = [];
+let rebuildPeerSession = null;
 
 let passRequired = false;
 let passSalt = null;
@@ -301,9 +303,13 @@ async function createShareLink(){
   // Start signaling and WebRTC
   connectSignaling();
 
-  pc = makePc();
+  const manifest = queue.map((q, i) => ({ index: i+1, name: q.file.name, size: q.file.size, mime: q.file.type || "application/octet-stream" }));
 
-  pc.onconnectionstatechange = () => {
+  function initPeerSession(){
+    teardownPeer();
+    pc = makePc();
+
+    pc.onconnectionstatechange = () => {
     // Single connection indicator:
     // - If the receiver has opened the link but WebRTC isn't connected yet, show that.
     // - Otherwise show the current peer connection state.
@@ -325,17 +331,17 @@ async function createShareLink(){
       ping("failed", { reason: pc.connectionState });
       if (!transferCompleted) resetForReceiverRetry();
     }
-  };
+    };
 
-  pc.onicecandidate = (ev) => {
-    if (ev.candidate) signalSend({ token, role: "sender", type: "ice", payload: ev.candidate });
-  };
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate) signalSend({ token, role: "sender", type: "ice", payload: ev.candidate });
+    };
 
-  dc = pc.createDataChannel("file", { ordered: true });
-  dc.binaryType = "arraybuffer";
+    dc = pc.createDataChannel("file", { ordered: true });
+    dc.binaryType = "arraybuffer";
 
-  let receiverReady = false;
-  dc.onmessage = async (ev) => {
+    let receiverReady = false;
+    dc.onmessage = async (ev) => {
     if (typeof ev.data !== "string") return;
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
@@ -363,7 +369,7 @@ async function createShareLink(){
       receiverReady = true;
       return;
     }
-  };
+    };
 
   async function safeSendJson(o){
     try { dc.send(JSON.stringify(o)); } catch {}
@@ -467,15 +473,13 @@ async function createShareLink(){
     return [...out].map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
-  const manifest = queue.map((q, i) => ({ index: i+1, name: q.file.name, size: q.file.size, mime: q.file.type || "application/octet-stream" }));
-
-  async function sendManifest(){
+    async function sendManifest(){
     safeSendJson({ type: "manifest", files: manifest, totalBytes });
     setXferStatus("Waiting for receiver consent", "warn");
     await ping("waiting_consent", { bytes: totalBytes });
-  }
+    }
 
-  dc.onopen = async () => {
+    dc.onopen = async () => {
     const saltHex = passSalt ? bufToHex(passSalt) : "";
     safeSendJson({ type: "hello", passRequired, salt: saltHex });
     if (passRequired) {
@@ -511,24 +515,33 @@ async function createShareLink(){
     }); 
     
     resetBtn.disabled = false;
-  };
+    };
 
-  dc.onclose = () => {
-    if (!transferCompleted) {
-      setXferStatus("Connection lost. Waiting for reconnect", "warn");
-      resetForReceiverRetry();
-    } else {
-      setXferStatus("Channel closed", "bad");
-    }
-    resetBtn.disabled = false;
-    ping("closed");
-  };
-  dc.onerror = () => { setXferStatus("Transfer error", "bad"); resetBtn.disabled = false; ping("failed", { reason: "datachannel_error" }); };
+    dc.onclose = () => {
+      if (!transferCompleted) {
+        setXferStatus("Connection lost. Waiting for reconnect", "warn");
+        resetForReceiverRetry();
+      } else {
+        setXferStatus("Channel closed", "bad");
+      }
+      resetBtn.disabled = false;
+      ping("closed");
+    };
+    dc.onerror = () => { setXferStatus("Transfer error", "bad"); resetBtn.disabled = false; ping("failed", { reason: "datachannel_error" }); };
+  }
+
+  rebuildPeerSession = initPeerSession;
+  initPeerSession();
 }
 
 async function beginNegotiationIfReady() {
   if (startedNegotiation) return;
   if (!receiverPresent) return;
+  if (!pc || !dc || pc.connectionState === "closed" || dc.readyState === "closed") {
+    setXferStatus("Reconnecting session", "warn");
+    if (typeof rebuildPeerSession === "function") rebuildPeerSession();
+    if (!pc) return;
+  }
 
   startedNegotiation = true;
   setTopStatus("Negotiating", "warn");
