@@ -73,8 +73,8 @@ a:hover{ text-decoration:underline; }
 .brand h1 .brand{
   color: #fff;
   text-shadow:
-    0 0 10px rgba(255,255,255,.75),
-    0 0 22px rgba(110,231,255,.45);
+    0 0 40px rgba(255,255,255,.45),
+    0 0 52px rgba(110,231,255,.15);
 }
 
 .brand h1 .brand:hover{
