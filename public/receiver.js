@@ -35,6 +35,7 @@ const currentFileEl = $("currentFile");
 const token = location.pathname.split("/").pop();
 
 let ws, pc, dc;
+let wsReconnectTimer = null;
 
 let manifest = null;  // { files: [{index,name,size,mime}], totalBytes }
 let accepted = false;
@@ -108,11 +109,7 @@ async function ping(event, extra = {}) {
   }).catch(() => {});
 }
 
-ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/signal`);
-ws.onmessage = async (e) => onSignal(JSON.parse(e.data));
-ws.onopen = () => { setNet("connected"); ws.send(JSON.stringify({ token, role: "receiver", type: "join" })); };
-ws.onclose = () => setNet("closed");
-ws.onerror = () => setNet("error");
+connectSignaling();
 
 pc = makePc();
 
@@ -488,6 +485,22 @@ function setupChannel() {
   };
 }
 
+function connectSignaling(){
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/signal`);
+  ws.onmessage = async (e) => onSignal(JSON.parse(e.data));
+  ws.onopen = () => {
+    setNet("connected");
+    ws.send(JSON.stringify({ token, role: "receiver", type: "join" }));
+  };
+  ws.onclose = () => {
+    setNet("reconnecting");
+    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(() => connectSignaling(), 1000);
+  };
+  ws.onerror = () => setNet("error");
+}
+
 async function finalizeFile(index){
   if (!receiving || receiving.index !== index) {
     // still finalize with whatever buffers are present
@@ -524,10 +537,41 @@ function finalizeAll(){
 async function onSignal(msg) {
   if (msg.type === "offer") {
     setTopStatus("Negotiating", "warn");
+    if (!pc || pc.signalingState === "closed") {
+      pc = makePc();
+      pc.onconnectionstatechange = () => {
+        safeText(connStateEl, pc.connectionState);
+        if (pc.connectionState === "connected") {
+          setTopStatus("Connected", "ok");
+          return;
+        }
+        if (pc.connectionState === "disconnected") {
+          setTopStatus("Connection hiccup", "warn");
+          return;
+        }
+        if (pc.connectionState === "failed") {
+          setTopStatus("Connection problem", "bad");
+          setXferStatus("Failed", "bad");
+          ping("failed", { reason: pc.connectionState });
+        }
+      };
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ token, role: "receiver", type: "ice", payload: ev.candidate }));
+        }
+      };
+      pc.ondatachannel = (ev) => {
+        dc = ev.channel;
+        dc.binaryType = "arraybuffer";
+        setupChannel();
+      };
+    }
     await pc.setRemoteDescription(msg.payload);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    ws.send(JSON.stringify({ token, role: "receiver", type: "answer", payload: answer }));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ token, role: "receiver", type: "answer", payload: answer }));
+    }
     return;
   }
 

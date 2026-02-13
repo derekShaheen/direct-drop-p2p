@@ -57,7 +57,6 @@ function setConnDisplay(text){
 
 function resetForReceiverRetry(){
   // Allow a receiver to reopen the same link without requiring a new token.
-  teardownPeer();
   startedNegotiation = false;
   setTopStatus("Waiting for receiver", "warn");
   setXferStatus("Waiting", "warn");
@@ -70,6 +69,8 @@ const rowBars = new Map();
 let transferCompleted = false;
 let startedNegotiation = false;
 let locked = false;
+let wsReconnectTimer = null;
+let pendingSignals = [];
 
 let passRequired = false;
 let passSalt = null;
@@ -298,11 +299,7 @@ async function createShareLink(){
   setNet("connecting");
 
   // Start signaling and WebRTC
-  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/signal`);
-  ws.onmessage = async (e) => onSignal(JSON.parse(e.data));
-  ws.onopen = () => { setNet("connected"); ws.send(JSON.stringify({ token, role: "sender", type: "join" })); };
-  ws.onclose = () => { setNet("closed"); resetBtn.disabled = false; };
-  ws.onerror = () => { setNet("error"); resetBtn.disabled = false; };
+  connectSignaling();
 
   pc = makePc();
 
@@ -331,7 +328,7 @@ async function createShareLink(){
   };
 
   pc.onicecandidate = (ev) => {
-    if (ev.candidate) ws.send(JSON.stringify({ token, role: "sender", type: "ice", payload: ev.candidate }));
+    if (ev.candidate) signalSend({ token, role: "sender", type: "ice", payload: ev.candidate });
   };
 
   dc = pc.createDataChannel("file", { ordered: true });
@@ -516,7 +513,16 @@ async function createShareLink(){
     resetBtn.disabled = false;
   };
 
-  dc.onclose = () => { setXferStatus("Channel closed", "bad"); resetBtn.disabled = false; ping("closed"); };
+  dc.onclose = () => {
+    if (!transferCompleted) {
+      setXferStatus("Connection lost. Waiting for reconnect", "warn");
+      resetForReceiverRetry();
+    } else {
+      setXferStatus("Channel closed", "bad");
+    }
+    resetBtn.disabled = false;
+    ping("closed");
+  };
   dc.onerror = () => { setXferStatus("Transfer error", "bad"); resetBtn.disabled = false; ping("failed", { reason: "datachannel_error" }); };
 }
 
@@ -527,9 +533,43 @@ async function beginNegotiationIfReady() {
   startedNegotiation = true;
   setTopStatus("Negotiating", "warn");
 
-  const offer = await pc.createOffer();
+  const offer = await pc.createOffer({ iceRestart: true });
   await pc.setLocalDescription(offer);
-  ws.send(JSON.stringify({ token, role: "sender", type: "offer", payload: offer }));
+  signalSend({ token, role: "sender", type: "offer", payload: offer });
+}
+
+function signalSend(msg){
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(msg));
+    return;
+  }
+  pendingSignals.push(msg);
+}
+
+function connectSignaling(){
+  if (!token || transferCompleted) return;
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/signal`);
+  ws.onmessage = async (e) => onSignal(JSON.parse(e.data));
+  ws.onopen = () => {
+    setNet("connected");
+    ws.send(JSON.stringify({ token, role: "sender", type: "join" }));
+    while (pendingSignals.length && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(pendingSignals.shift()));
+    }
+  };
+  ws.onclose = () => {
+    if (transferCompleted) {
+      setNet("closed");
+      resetBtn.disabled = false;
+      return;
+    }
+    setNet("reconnecting");
+    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(() => connectSignaling(), 1000);
+  };
+  ws.onerror = () => { setNet("error"); };
 }
 
 async function onSignal(msg) {
