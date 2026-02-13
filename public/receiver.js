@@ -39,6 +39,7 @@ let wsReconnectTimer = null;
 
 let manifest = null;  // { files: [{index,name,size,mime}], totalBytes }
 let accepted = false;
+let hasStarted = false;
 
 let hello = null;     // { passRequired, salt }
 let authOk = false;
@@ -51,6 +52,8 @@ let receivedForFile = 0;
 
 let totalBytes = 0;
 let totalReceived = 0;
+const completedFiles = new Set();
+const completedDownloads = new Map(); // index -> { url, filename }
 
 let lastBytes = 0;
 let lastT = performance.now();
@@ -176,15 +179,24 @@ startBtn.addEventListener("click", async () => {
   if (hello?.passRequired && !authOk) return;
   accepted = true;
   startBtn.disabled = true;
+  hasStarted = true;
   startBtn.textContent = "Downloading…";
   setTopStatus("Downloading", "warn");
   setXferStatus("Receiving", "warn");
-  setProgress(barEl, 0);
-  progressTextEl.textContent = `0 / ${fmtBytes(totalBytes)}`;
+  setProgress(barEl, totalBytes ? (totalReceived / totalBytes) : 0);
+  progressTextEl.textContent = `${fmtBytes(totalReceived)} / ${fmtBytes(totalBytes)}`;
   rateTextEl.textContent = "—";
-  dc.send(JSON.stringify({ type: "ready" }));
+  dc.send(JSON.stringify({ type: "ready", resumeFrom: getResumeIndex() }));
   await ping("accepted", { bytes: totalBytes });
 });
+
+function getResumeIndex(){
+  if (!manifest?.files?.length) return 1;
+  for (const f of manifest.files) {
+    if (!completedFiles.has(f.index)) return f.index;
+  }
+  return manifest.files.length + 1;
+}
 
 function renderManifest(){
   if (!manifest) return;
@@ -229,6 +241,26 @@ function showSaveLink(index, url, filename){
   a.href = url;
   a.download = filename;
   a.style.display = "inline-flex";
+}
+
+function applyCompletedStateToManifest(){
+  if (!manifest) return;
+  completedFiles.forEach((idx) => {
+    const fileMeta = manifest.files.find((f) => f.index === idx);
+    if (!fileMeta) return;
+    setRowProgress(idx, 1);
+    setRowStatus(idx, "complete");
+    const prior = completedDownloads.get(idx);
+    if (prior) showSaveLink(idx, prior.url, prior.filename);
+  });
+}
+
+function recomputeTotalReceived(){
+  if (!manifest) return 0;
+  totalReceived = manifest.files
+    .filter((f) => completedFiles.has(f.index))
+    .reduce((sum, f) => sum + (f.size || 0), 0);
+  return totalReceived;
 }
 
 function escapeHtml(s){
@@ -394,24 +426,44 @@ function setupChannel() {
       if (msg.type === "manifest") {
         manifest = msg;
         totalBytes = msg.totalBytes || msg.files.reduce((a, f) => a + (f.size||0), 0);
-        totalReceived = 0;
-        lastBytes = 0;
+        accepted = false;
+        receiving = null;
+        buffers = [];
+        receivedForFile = 0;
+
+        completedFiles.forEach((idx) => {
+          if (!msg.files.some((f) => f.index === idx)) {
+            completedFiles.delete(idx);
+            const prior = completedDownloads.get(idx);
+            if (prior?.url) URL.revokeObjectURL(prior.url);
+            completedDownloads.delete(idx);
+          }
+        });
+
+        recomputeTotalReceived();
+        lastBytes = totalReceived;
         lastT = performance.now();
 
         renderManifest();
+        applyCompletedStateToManifest();
         updateSaveAllState();
 
         setTopStatus("Review queue", "warn");
         setXferStatus("Waiting for consent", "warn");
         startBtn.style.display = "inline-flex";
         startBtn.disabled = false;
-        startBtn.textContent = "Start download";
+        startBtn.textContent = hasStarted ? "Resume download" : "Start download";
+        setProgress(barEl, totalBytes ? (totalReceived / totalBytes) : 0);
+        progressTextEl.textContent = `${fmtBytes(totalReceived)} / ${fmtBytes(totalBytes)}`;
 
         ping("meta_received", { bytes: totalBytes });
         return;
       }
 
       if (msg.type === "meta") {
+        if (completedFiles.has(msg.index)) {
+          return;
+        }
         receiving = msg; // {index,name,size,mime}
         buffers = [];
         receivedForFile = 0;
@@ -473,8 +525,8 @@ function setupChannel() {
   dc.onclose = () => {
     safeText(dcStateEl, "closed");
     if (accepted) {
-      setXferStatus("Channel closed", "bad");
-      ping("failed", { reason: "datachannel_closed" });
+      setXferStatus("Connection lost. Reconnect to resume", "warn");
+      ping("closed", { reason: "datachannel_closed" });
     }
   };
 
@@ -508,12 +560,17 @@ async function finalizeFile(index){
   const name = receiving?.name || `file_${index}`;
   const mime = receiving?.mime || "application/octet-stream";
 
-	  const blob = new Blob(buffers, { type: mime });
-	  const url = URL.createObjectURL(blob);
-	  showSaveLink(index, url, name);
-	  setRowStatus(index, "ready");
+  const blob = new Blob(buffers, { type: mime });
+  const url = URL.createObjectURL(blob);
+  showSaveLink(index, url, name);
+  completedDownloads.set(index, { url, filename: name });
+  completedFiles.add(index);
+  setRowStatus(index, "complete");
 
   setRowProgress(index, 1);
+  recomputeTotalReceived();
+  setProgress(barEl, totalBytes ? (totalReceived / totalBytes) : 0);
+  progressTextEl.textContent = `${fmtBytes(totalReceived)} / ${fmtBytes(totalBytes)}`;
   updateSaveAllState();
   receiving = null;
   buffers = [];

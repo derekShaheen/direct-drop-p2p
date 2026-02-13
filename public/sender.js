@@ -442,6 +442,7 @@ async function createShareLink(){
     dc.binaryType = "arraybuffer";
 
     let receiverReady = false;
+    let resumeFromIndex = 1;
     dc.onmessage = async (ev) => {
     if (typeof ev.data !== "string") return;
     let msg;
@@ -468,6 +469,10 @@ async function createShareLink(){
 
     if (msg.type === "ready") {
       receiverReady = true;
+      const idx = Number(msg.resumeFrom);
+      if (Number.isFinite(idx) && idx > 0) {
+        resumeFromIndex = Math.floor(idx);
+      }
       return;
     }
     };
@@ -606,7 +611,7 @@ async function createShareLink(){
     await ping("accepted", { bytes: totalBytes });
 
     setXferStatus("Transferring", "warn");
-    await sendQueueSequential(manifest, totalBytes);
+    await sendQueueSequential(manifest, totalBytes, resumeFromIndex);
 
     setXferStatus("Complete", "ok");
     transferCompleted = true;
@@ -714,10 +719,15 @@ async function onSignal(msg) {
   }
 }
 
-async function sendQueueSequential(manifest, totalBytes){
+async function sendQueueSequential(manifest, totalBytes, resumeFromIndex = 1){
+  const startAt = Math.max(1, Math.min(queue.length + 1, Math.floor(resumeFromIndex || 1)));
+
   // Overall progress is total bytes sent across all files.
   let totalSent = 0;
-  let lastSent = 0;
+  for (let i = 0; i < startAt - 1; i++) {
+    totalSent += queue[i]?.file?.size || 0;
+  }
+  let lastSent = totalSent;
   let lastT = performance.now();
 
   let fileSent = 0;
@@ -772,7 +782,15 @@ async function sendQueueSequential(manifest, totalBytes){
   }
 
 
-  for (let i = 0; i < queue.length; i++) {
+  setProgress(barEl, totalBytes ? (totalSent / totalBytes) : 0);
+  progressTextEl.textContent = `File: — • Total: ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)}`;
+
+  if (startAt > queue.length) {
+    dc.send(JSON.stringify({ type: "done" }));
+    return;
+  }
+
+  for (let i = startAt - 1; i < queue.length; i++) {
     const f = queue[i].file;
     fileSent = 0;
     fileSize = f.size || 0;
