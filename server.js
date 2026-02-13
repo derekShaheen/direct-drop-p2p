@@ -126,18 +126,18 @@ function safeSend(ws, obj) {
 
 // Pages rendered with embedded public stats (no stats API required)
 app.get("/", (_req, res) => {
-  res.type("html").send(renderPage("sender.html"));
+  res.type("html").send(renderPage("pages/sender.html"));
 });
 app.get("/sender.html", (_req, res) => {
-  res.type("html").send(renderPage("sender.html"));
+  res.type("html").send(renderPage("pages/sender.html"));
 });
 
 app.get("/receiver.html", (_req, res) => {
-  res.type("html").send(renderPage("receiver.html"));
+  res.type("html").send(renderPage("pages/receiver.html"));
 });
 
 app.get("/privacy", (_req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "privacy.html"));
+  res.sendFile(path.join(PUBLIC_DIR, "pages/privacy.html"));
 });
 
 app.get("/api/create", (_req, res) => {
@@ -159,7 +159,7 @@ app.get("/t/:token", (req, res) => {
     res.status(404).type("text").send("Link expired or invalid.");
     return;
   }
-  res.type("html").send(renderPage("receiver.html"));
+  res.type("html").send(renderPage("pages/receiver.html"));
 });
 
 app.post("/api/metrics/ping", express.json(), (req, res) => {

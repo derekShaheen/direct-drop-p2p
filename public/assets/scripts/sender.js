@@ -1,6 +1,6 @@
-import { makePc } from "./webrtc.js";
+import { makePc } from "/assets/scripts/webrtc.js";
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm";
-import { $, setStatus, setProgress, fmtBytes, fmtRate, fmtETA } from "./ui.js";
+import { $, setStatus, setProgress, fmtBytes, fmtRate, fmtETA } from "/assets/scripts/ui.js";
 
 function safeText(el, value){ if (el) el.textContent = value; }
 
