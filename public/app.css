@@ -19,21 +19,17 @@
 
 
 /* Background should extend with content (avoid visible cutoff on tall pages) */
-html, body {
+*{ box-sizing:border-box; }
+html, body{
   min-height: 100%;
+  padding-left: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 4vw, 40px), env(safe-area-inset-right));
 }
 
 body {
   background-attachment: fixed;
   background-repeat: no-repeat;
   background-size: cover;
-}
-
-*{ box-sizing:border-box; }
-html,body{
-  padding-left: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left));
-  padding-right: max(clamp(16px, 4vw, 40px), env(safe-area-inset-right));
- height:100%; 
 }
 
 body{
