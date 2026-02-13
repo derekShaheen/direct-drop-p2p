@@ -184,6 +184,7 @@ function lockQueue(){
   drop.style.display = "none";
   fileInput.style.display = "none";
   if (queueControlsRow) queueControlsRow.style.display = "none";
+  if (passEl) passEl.readOnly = true;
 
   if (shareOut) shareOut.style.display = "block";
   if (transferCard) transferCard.style.display = "block";
