@@ -411,6 +411,18 @@ a:hover{ text-decoration:underline; }
   align-items:center;
   gap: 10px;
 }
+.brand-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+}
+@media (max-width: 640px){
+  .brand-header{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+}
 .brandmark{
   width: 28px;
   height: 28px;
