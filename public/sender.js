@@ -180,8 +180,8 @@ function lockQueue(){
   // Hide manipulation controls for a cleaner locked view
   queueEl.querySelectorAll("button.iconbtn, input.num").forEach(el => el.style.display = "none");
 
-  drop.style.opacity = "0.6";
-  drop.style.pointerEvents = "none";
+  drop.style.display = "none";
+  fileInput.style.display = "none";
 
   if (shareOut) shareOut.style.display = "block";
   if (transferCard) transferCard.style.display = "block";
