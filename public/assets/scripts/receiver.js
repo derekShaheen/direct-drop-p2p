@@ -194,8 +194,8 @@ function updateFolderUi(){
   folderReadyRequired = total > LARGE_TRANSFER_THRESHOLD;
 
   if (pickFolderBtn) {
-    pickFolderBtn.style.display = "inline-flex";
-    pickFolderBtn.disabled = !canUseFileSystemAccess();
+    pickFolderBtn.style.display = canUseFileSystemAccess() ? "inline-flex" : "none";
+    pickFolderBtn.disabled = false;
     pickFolderBtn.textContent = folderHandle ? "Folder selected" : "Choose folder";
   }
 
@@ -203,9 +203,7 @@ function updateFolderUi(){
   folderHintEl.style.display = "";
 
   if (!canUseFileSystemAccess()) {
-    folderHintEl.textContent = folderReadyRequired
-      ? "Transfers over 7 GB require choosing a download folder, but this browser context does not support folder saving."
-      : "Folder saving is not available here. Save links will appear per file.";
+    folderHintEl.textContent = "Folder saving is not available here. Files will use standard Save links.";
     return;
   }
 
@@ -286,10 +284,6 @@ startBtn.addEventListener("click", async () => {
         setXferStatus("Waiting for folder", "warn");
         return;
       }
-    } else {
-      setTopStatus("Folder selection unsupported in this browser context", "bad");
-      setXferStatus("Cannot start large transfer here", "bad");
-      return;
     }
   }
 
