@@ -18,6 +18,8 @@ const netEl = $("net");
 const queueEl = $("queue");
 const startBtn = $("startBtn");
 const saveAllBtn = $("saveAllBtn");
+const pickFolderBtn = $("pickFolderBtn");
+const folderHintEl = $("folderHint");
 
 const authBox = $("authBox");
 const passIn = $("passIn");
@@ -34,6 +36,9 @@ const currentFileEl = $("currentFile");
 
 const token = location.pathname.split("/").pop();
 
+const LARGE_TRANSFER_THRESHOLD = 7 * 1024 * 1024 * 1024;
+const LARGE_FILE_THRESHOLD = 8 * 1024 * 1024 * 1024;
+
 let ws, pc, dc;
 let wsReconnectTimer = null;
 
@@ -41,6 +46,11 @@ let manifest = null;  // { files: [{index,name,size,mime}], totalBytes }
 let accepted = false;
 let selectedFileIndexes = new Set();
 let selectedOrder = [];
+
+let folderHandle = null;
+let useFolderDownload = false;
+let folderReadyRequired = false;
+let streamWriter = null;
 
 let hello = null;     // { passRequired, salt }
 let authOk = false;
@@ -159,6 +169,79 @@ saveAllBtn.addEventListener("click", async () => {
   }
 });
 
+function canUseFileSystemAccess(){
+  return typeof window !== "undefined"
+    && typeof window.showDirectoryPicker === "function"
+    && !!window.isSecureContext;
+}
+
+function selectedBytes(){
+  if (!manifest) return 0;
+  return manifest.files
+    .filter((f) => selectedFileIndexes.has(f.index))
+    .reduce((a, f) => a + (f.size || 0), 0);
+}
+
+function updateFolderUi(){
+  if (!manifest) {
+    if (pickFolderBtn) pickFolderBtn.style.display = "none";
+    if (folderHintEl) folderHintEl.style.display = "none";
+    return;
+  }
+
+  const total = selectedBytes();
+  const hasLargeFile = manifest.files.some((f) => selectedFileIndexes.has(f.index) && (f.size || 0) > LARGE_FILE_THRESHOLD);
+  folderReadyRequired = total > LARGE_TRANSFER_THRESHOLD;
+
+  if (pickFolderBtn) {
+    pickFolderBtn.style.display = canUseFileSystemAccess() ? "inline-flex" : "none";
+    pickFolderBtn.textContent = folderHandle ? "Folder selected" : "Choose folder";
+  }
+
+  if (!folderHintEl) return;
+  folderHintEl.style.display = "";
+
+  if (!canUseFileSystemAccess()) {
+    folderHintEl.textContent = folderReadyRequired
+      ? "Transfers over 7 GB require choosing a download folder, but this browser context does not support folder saving."
+      : "Folder saving is not available here. Save links will appear per file.";
+    return;
+  }
+
+  if (folderReadyRequired) {
+    folderHintEl.textContent = folderHandle
+      ? "Transfer exceeds 7 GB. Files will be saved directly to the selected folder."
+      : "Transfer exceeds 7 GB. Choose a folder before starting download.";
+    return;
+  }
+
+  if (hasLargeFile) {
+    folderHintEl.textContent = folderHandle
+      ? "A file exceeds 8 GB. Folder saving is enabled to reduce memory-related failures."
+      : "A file exceeds 8 GB. Choosing a folder is recommended to avoid memory-related failures.";
+    return;
+  }
+
+  folderHintEl.textContent = folderHandle
+    ? "Folder saving enabled. Files will be written directly to the selected folder."
+    : "You can optionally choose a folder to save files directly instead of keeping data in memory.";
+}
+
+async function chooseFolder(){
+  if (!canUseFileSystemAccess()) return;
+  try {
+    folderHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    useFolderDownload = true;
+    updateFolderUi();
+  } catch (err) {
+    if (err?.name !== "AbortError") setTopStatus("Unable to use selected folder", "bad");
+  }
+}
+
+pickFolderBtn?.addEventListener("click", async () => {
+  await chooseFolder();
+});
+
 passGo?.addEventListener("click", async () => {
   if (!dc || !hello?.passRequired) return;
   const pass = (passIn.value || "").trim();
@@ -191,6 +274,13 @@ startBtn.addEventListener("click", async () => {
 
   selectedFileIndexes = new Set(selected);
   selectedOrder = selected;
+  updateFolderUi();
+  if (folderReadyRequired && !folderHandle) {
+    setTopStatus("Choose a folder for transfers over 7 GB", "bad");
+    setXferStatus("Waiting for folder", "warn");
+    return;
+  }
+
   totalBytes = manifest.files
     .filter((f) => selectedFileIndexes.has(f.index))
     .reduce((a, f) => a + (f.size || 0), 0);
@@ -237,7 +327,16 @@ function renderManifest(){
       <a class="btn" id="dl_${f.index}" style="display:none; padding:8px 10px; border-radius: 10px;" href="#" download>Save</a>
     `;
     queueEl.appendChild(row);
+
+    const checkbox = row.querySelector(`#pick_${f.index}`);
+    checkbox?.addEventListener("change", () => {
+      if (checkbox.checked) selectedFileIndexes.add(f.index);
+      else selectedFileIndexes.delete(f.index);
+      updateFolderUi();
+    });
   });
+
+  updateFolderUi();
 }
 
 function setRowStatus(index, text){
@@ -442,6 +541,7 @@ function setupChannel() {
 
         selectedFileIndexes = new Set(msg.files.map((f) => f.index));
         selectedOrder = msg.files.map((f) => f.index);
+        useFolderDownload = !!folderHandle;
 
         setTopStatus("Review queue", "warn");
         setXferStatus("Waiting for consent", "warn");
@@ -457,6 +557,16 @@ function setupChannel() {
         receiving = msg; // {index,name,size,mime}
         buffers = [];
         receivedForFile = 0;
+
+        if (folderHandle && useFolderDownload) {
+          try {
+            const fileHandle = await folderHandle.getFileHandle(msg.name, { create: true });
+            streamWriter = await fileHandle.createWritable();
+          } catch {
+            streamWriter = null;
+            setXferStatus("Folder write unavailable", "bad");
+          }
+        }
 	        
         const ordinal = Math.max(1, selectedOrder.indexOf(msg.index) + 1);
         currentFileEl.textContent = `${ordinal}/${Math.max(1, selectedOrder.length)} ${msg.name}`;
@@ -482,7 +592,17 @@ function setupChannel() {
     if (!accepted || !receiving) return;
 
     const chunk = ev.data;
+    if (streamWriter) {
+      try {
+        await streamWriter.write(chunk);
+      } catch {
+        try { await streamWriter.abort?.(); } catch {}
+        streamWriter = null;
+        setXferStatus("Folder write failed", "bad");
+      }
+    } else {
 	    buffers.push(chunk);
+    }
     receivedForFile += chunk.byteLength;
     totalReceived += chunk.byteLength;
 
@@ -551,10 +671,20 @@ async function finalizeFile(index){
   const name = receiving?.name || `file_${index}`;
   const mime = receiving?.mime || "application/octet-stream";
 
-	  const blob = new Blob(buffers, { type: mime });
+  if (streamWriter) {
+    try {
+      await streamWriter.close();
+      setRowStatus(index, "saved");
+    } catch {
+      setRowStatus(index, "save failed");
+    }
+    streamWriter = null;
+  } else {
+    const blob = new Blob(buffers, { type: mime });
 	  const url = URL.createObjectURL(blob);
 	  showSaveLink(index, url, name);
 	  setRowStatus(index, "ready");
+  }
 
   setRowProgress(index, 1);
   updateSaveAllState();
