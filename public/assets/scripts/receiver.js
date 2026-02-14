@@ -194,7 +194,8 @@ function updateFolderUi(){
   folderReadyRequired = total > LARGE_TRANSFER_THRESHOLD;
 
   if (pickFolderBtn) {
-    pickFolderBtn.style.display = canUseFileSystemAccess() ? "inline-flex" : "none";
+    pickFolderBtn.style.display = "inline-flex";
+    pickFolderBtn.disabled = !canUseFileSystemAccess();
     pickFolderBtn.textContent = folderHandle ? "Folder selected" : "Choose folder";
   }
 
@@ -228,13 +229,15 @@ function updateFolderUi(){
 }
 
 async function chooseFolder(){
-  if (!canUseFileSystemAccess()) return;
+  if (!canUseFileSystemAccess()) return false;
   try {
     folderHandle = await window.showDirectoryPicker({ mode: "readwrite" });
     useFolderDownload = true;
     updateFolderUi();
+    return true;
   } catch (err) {
     if (err?.name !== "AbortError") setTopStatus("Unable to use selected folder", "bad");
+    return false;
   }
 }
 
@@ -276,9 +279,18 @@ startBtn.addEventListener("click", async () => {
   selectedOrder = selected;
   updateFolderUi();
   if (folderReadyRequired && !folderHandle) {
-    setTopStatus("Choose a folder for transfers over 7 GB", "bad");
-    setXferStatus("Waiting for folder", "warn");
-    return;
+    if (canUseFileSystemAccess()) {
+      const picked = await chooseFolder();
+      if (!picked || !folderHandle) {
+        setTopStatus("Choose a folder for transfers over 7 GB", "bad");
+        setXferStatus("Waiting for folder", "warn");
+        return;
+      }
+    } else {
+      setTopStatus("Folder selection unsupported in this browser context", "bad");
+      setXferStatus("Cannot start large transfer here", "bad");
+      return;
+    }
   }
 
   totalBytes = manifest.files
